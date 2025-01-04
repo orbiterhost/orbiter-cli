@@ -1,15 +1,17 @@
 # orbiter-cli
 
-To install dependencies:
+Usage: orbiter [options] [command]
 
-```bash
-bun install
-```
+Upload and deploy static sites with Orbiter.host
 
-To run:
+Options:
+  -V, --version            output the version number
+  -h, --help               display help for command
 
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.1.42. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+Commands:
+  login [options]          Login with OAuth
+  create [options] <path>  Upload and create a new site on Orbiter
+  list                     List existing sites for your account
+  update [options] <path>  Update a site with a new file or folder
+  delete <siteId>          Delete an existing site
+  help [command]           display help for command
