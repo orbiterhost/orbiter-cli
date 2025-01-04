@@ -2,6 +2,7 @@ import ora from "ora";
 import { getValidTokens, supabase } from "./auth";
 import { uploadSite } from "./pinata";
 import dotenv from "dotenv";
+import { API_URL } from "../config"
 
 dotenv.config()
 
@@ -55,7 +56,7 @@ export async function createSite(path: string, subdomain: string) {
 
     const memberships: any = await getOrgMemebershipsForUser()
 
-    const createReq = await fetch(`${process.env.API_URL}/sites`, {
+    const createReq = await fetch(`${API_URL}/sites`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -103,7 +104,7 @@ export async function listSites() {
 
     const memberships: any = await getOrgMemebershipsForUser()
     const orgId = memberships[0].organizations.id
-    const siteReq = await fetch(`${process.env.API_URL}/organizations/${orgId}/sites`, {
+    const siteReq = await fetch(`${API_URL}/organizations/${orgId}/sites`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -142,7 +143,7 @@ export async function updateSite(siteId: string, cid: string) {
       return;
     }
 
-    const updateReq = await fetch(`${process.env.API_URL}/sites/${siteId}`, {
+    const updateReq = await fetch(`${API_URL}/sites/${siteId}`, {
       method: "PUT",
       //  @ts-ignore
       headers: {
@@ -188,7 +189,7 @@ export async function deleteSite(siteId: string) {
       return;
     }
 
-    const deleteReq = await fetch(`${process.env.API_URL}/sites/${siteId}`, {
+    const deleteReq = await fetch(`${API_URL}/sites/${siteId}`, {
       method: "DELETE",
       //	@ts-ignore
       headers: {

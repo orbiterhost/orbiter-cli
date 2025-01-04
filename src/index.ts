@@ -21,7 +21,7 @@ async function main() {
   program
     .name('orbiter')
     .description('Upload and deploy static sites with Orbiter.host')
-    .version('0.0.1')
+    .version('0.0.3')
 
   program
     .command('login')
