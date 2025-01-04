@@ -100,7 +100,7 @@ const deleteCmd = command({
 const cli = subcommands({
   name: 'orbiter',
   description: 'Upload and deploy static sites with Orbiter.host',
-  version: '0.0.8',
+  version: '0.0.9',
   cmds: {
     login: loginCmd,
     create: createCmd,
