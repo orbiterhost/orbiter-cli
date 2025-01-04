@@ -166,7 +166,7 @@ export async function login(provider: Provider) {
 
     // Start the server
     serverHandle = app.listen(54321, () => {
-      spinner = ora("Logging in...").start()
+      console.log("Starting server on port 54321...")
     });
 
 
