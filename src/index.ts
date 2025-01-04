@@ -73,8 +73,7 @@ async function main() {
         console.log("Please provide a path to the site folder or file you want to upload")
         return
       }
-      const upload = await uploadSite(path)
-      await updateSite(options.siteId, upload?.IpfsHash as string)
+      await updateSite(options.siteId, path)
     })
 
   program

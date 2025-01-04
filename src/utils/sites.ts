@@ -122,9 +122,10 @@ export async function listSites() {
 }
 
 
-export async function updateSite(siteId: string, cid: string) {
+export async function updateSite(siteId: string, path: string) {
   try {
     const spinner = ora("Updating site...").start()
+    const upload = await uploadSite(path)
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
@@ -151,7 +152,7 @@ export async function updateSite(siteId: string, cid: string) {
         "X-Orbiter-Token": tokens.access_token,
       },
       body: JSON.stringify({
-        cid,
+        cid: upload?.IpfsHash,
       }),
     });
     if (!updateReq.ok) {
