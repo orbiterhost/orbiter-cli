@@ -1,9 +1,8 @@
 {
   "name": "orbiter-cli",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "author": "Steve Simkins",
   "license": "MIT",
-  "type": "commonjs",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
@@ -25,6 +24,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",
+    "cmd-ts": "^0.13.0",
     "commander": "^13.0.0",
     "conf": "^13.1.0",
     "dotenv": "^16.4.7",

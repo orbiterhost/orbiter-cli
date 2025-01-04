@@ -6,8 +6,6 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 
-
-
 export const supabase = createClient(
   SUPABASE_CONFIG.URL as string,
   SUPABASE_CONFIG.ANON_KEY as string
