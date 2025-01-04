@@ -1,4 +1,7 @@
 import { defineConfig } from 'tsup';
+import { config } from 'dotenv';
+const env = config().parsed || {};
+
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -20,6 +23,11 @@ export default defineConfig({
     js: '#!/usr/bin/env node',
   },
   treeshake: true,
+  define: {
+    'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
+    'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
+    'process.env.API_URL': JSON.stringify(env.API_URL),
+  },
   external: [
     /^node:.*/,  // Exclude node: imports from bundling
   ]
