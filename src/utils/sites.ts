@@ -1,4 +1,3 @@
-import ora from "ora";
 import { getValidTokens, supabase } from "./auth";
 import { uploadSite } from "./pinata";
 import dotenv from "dotenv";
@@ -32,8 +31,6 @@ const getOrgMemebershipsForUser = async () => {
 
 export async function createSite(path: string, subdomain: string) {
   try {
-    const spinner = ora("Creating site...").start()
-
     const upload = await uploadSite(path)
 
     const tokens = await getValidTokens();
@@ -72,9 +69,7 @@ export async function createSite(path: string, subdomain: string) {
       const result = await createReq.json()
       throw Error("Problem creating site:", result)
     }
-    spinner.stopAndPersist({
-      text: `Site created: https://${subdomain}.orbiter.host`
-    })
+
     return
   } catch (error) {
     console.log(error)
@@ -83,7 +78,6 @@ export async function createSite(path: string, subdomain: string) {
 
 export async function listSites() {
   try {
-    const spinner = ora("Fetching sites...").start()
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
@@ -112,7 +106,6 @@ export async function listSites() {
       },
     });
     const result = await siteReq.json()
-    spinner.stop()
     console.log(result)
     return result
 
@@ -124,7 +117,6 @@ export async function listSites() {
 
 export async function updateSite(siteId: string, path: string) {
   try {
-    const spinner = ora("Updating site...").start()
     const upload = await uploadSite(path)
     const tokens = await getValidTokens();
     if (!tokens) {
@@ -160,9 +152,6 @@ export async function updateSite(siteId: string, path: string) {
       throw Error("Problem updating site: ", updateRes)
     }
 
-    spinner.stopAndPersist({
-      text: `Site updated`
-    })
     return
   } catch (error) {
     console.log(error)
@@ -171,7 +160,6 @@ export async function updateSite(siteId: string, path: string) {
 
 export async function deleteSite(siteId: string) {
   try {
-    const spinner = ora("Deleting site...").start()
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
@@ -204,9 +192,6 @@ export async function deleteSite(siteId: string) {
       throw Error("Problem updating site: ", deleteRes)
     }
 
-    spinner.stopAndPersist({
-      text: `Site deleted`
-    })
     return
   } catch (error) {
     console.log(error)

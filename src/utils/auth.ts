@@ -5,9 +5,8 @@ import open from 'open'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import ora, { type Ora } from 'ora'
 
-let spinner: Spinner
+
 
 export const supabase = createClient(
   SUPABASE_CONFIG.URL as string,
@@ -198,9 +197,6 @@ export async function login(provider: Provider) {
         storeTokens(accessToken, refreshToken);
 
 
-        spinner.stopAndPersist({
-          text: `Login Successful!`
-        })
 
         res.status(200).send('Success');
 
