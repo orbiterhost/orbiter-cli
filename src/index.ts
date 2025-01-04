@@ -11,7 +11,6 @@ process.on('warning', (warning) => {
 
 import { Command } from 'commander'
 import { login } from './utils/auth';
-import { uploadSite } from './utils/pinata';
 import { createSite, deleteSite, listSites, updateSite } from './utils/sites';
 
 async function main() {
