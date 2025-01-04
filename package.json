@@ -1,6 +1,6 @@
 {
   "name": "orbiter-cli",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "author": "Steve Simkins",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -31,6 +31,7 @@
     "express": "^4.21.2",
     "inquirer": "^12.3.0",
     "open": "^10.1.0",
+    "ora": "^5.4.1",
     "pinata-web3": "^0.5.4"
   },
   "engines": {

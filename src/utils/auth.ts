@@ -5,6 +5,10 @@ import open from 'open'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
+import ora, { type Ora } from 'ora'
+
+let spinner: Ora
+
 
 export const supabase = createClient(
   SUPABASE_CONFIG.URL as string,
@@ -164,7 +168,7 @@ export async function login(provider: Provider) {
 
     // Start the server
     serverHandle = app.listen(54321, () => {
-      console.log("Starting server on port 54321...")
+      spinner = ora("Logging in...").start()
     });
 
 
@@ -194,7 +198,9 @@ export async function login(provider: Provider) {
 
         storeTokens(accessToken, refreshToken);
 
-
+        spinner.stopAndPersist({
+          text: `Login Successful!`
+        })
 
         res.status(200).send('Success');
 
