@@ -38,8 +38,6 @@ async function upload(filePath: string, key: string, userId: string) {
   // Call readDirRecursively before checking files.length
   readDirRecursively(distPath);
 
-  console.log(`Found ${files.length} files to upload`);
-
   let result;
   if (files.length > 1) {
     result = await pinata.upload.fileArray(files)

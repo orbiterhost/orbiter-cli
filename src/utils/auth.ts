@@ -5,6 +5,9 @@ import open from 'open'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
+import ora, { type Ora } from 'ora'
+
+let spinner: Spinner
 
 export const supabase = createClient(
   SUPABASE_CONFIG.URL as string,
@@ -162,6 +165,12 @@ export async function login(provider: Provider) {
         `);
     });
 
+    // Start the server
+    serverHandle = app.listen(54321, () => {
+      spinner = ora("Logging in...").start()
+    });
+
+
     // Handle the callback with the hash parameters
     app.get('/callback', async (req, res) => {
       try {
@@ -188,7 +197,11 @@ export async function login(provider: Provider) {
 
         storeTokens(accessToken, refreshToken);
 
-        console.log('Successfully logged in!');
+
+        spinner.stopAndPersist({
+          text: `Login Successful!`
+        })
+
         res.status(200).send('Success');
 
         // Close the server after successful login
@@ -203,10 +216,6 @@ export async function login(provider: Provider) {
       }
     });
 
-    // Start the server
-    serverHandle = app.listen(54321, () => {
-      console.log('Callback server listening on port 54321');
-    });
 
     // Start the OAuth flow
     const { data: { url } } = await supabase.auth.signInWithOAuth({
@@ -217,7 +226,6 @@ export async function login(provider: Provider) {
     });
 
     // Open the browser
-    console.log('Opening browser for authentication...');
     await open(url as string);
 
     // Add a timeout
