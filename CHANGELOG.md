@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2025-01-06
+
+### ⚙️ Miscellaneous Tasks
+
+- Add changelog
+- Require node v20
+- Version bump
+
 ## [0.1.0] - 2025-01-06
 
 ### 🐛 Bug Fixes
