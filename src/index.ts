@@ -1,6 +1,16 @@
 import { command, subcommands, run, binary, string, option, positional } from 'cmd-ts';
 import { login } from './utils/auth';
 import { createSite, deleteSite, listSites, updateSite } from './utils/sites';
+import figlet from "figlet"
+
+const text =
+  figlet.textSync("ORBITER", {
+    font: "Univers",
+    horizontalLayout: "default",
+    verticalLayout: "default",
+    width: 200,
+    whitespaceBreak: true,
+  })
 
 const loginCmd = command({
   name: 'login',
@@ -99,8 +109,8 @@ const deleteCmd = command({
 
 const cli = subcommands({
   name: 'orbiter',
-  description: 'Upload and deploy static sites with Orbiter.host',
-  version: '0.0.9',
+  description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter login`,
+  version: '0.1.0',
   cmds: {
     login: loginCmd,
     create: createCmd,
