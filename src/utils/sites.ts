@@ -32,14 +32,15 @@ const getOrgMemebershipsForUser = async () => {
 
 
 export async function createSite(path: string, subdomain: string) {
+  const spinner = ora("Creating site...").start()
   try {
-    const spinner = ora("Creating site...").start()
 
     const upload = await uploadSite(path)
 
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
+      spinner.stop()
       return;
     }
 
@@ -52,6 +53,7 @@ export async function createSite(path: string, subdomain: string) {
 
     if (error || !session) {
       console.log('No active session found');
+      spinner.stop()
       return;
     }
 
@@ -71,6 +73,7 @@ export async function createSite(path: string, subdomain: string) {
     });
     if (!createReq.ok) {
       const result = await createReq.json()
+      spinner.stop()
       throw Error("Problem creating site:", result)
     }
     spinner.stopAndPersist({
@@ -78,13 +81,14 @@ export async function createSite(path: string, subdomain: string) {
     })
     return
   } catch (error) {
+    spinner.stop()
     console.log(error)
   }
 }
 
 export async function listSites() {
+  const spinner = ora("Fetching sites...").start()
   try {
-    const spinner = ora("Fetching sites...").start()
 
     const tokens = await getValidTokens();
     if (!tokens) {
@@ -119,18 +123,20 @@ export async function listSites() {
     return result
 
   } catch (error) {
+    spinner.stop()
     console.log(error)
   }
 }
 
 
 export async function updateSite(siteId: string, path: string) {
+  const spinner = ora("Updating site...").start()
   try {
-    const spinner = ora("Updating site...").start()
     const upload = await uploadSite(path)
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
+      spinner.stop()
       return;
     }
 
@@ -143,6 +149,7 @@ export async function updateSite(siteId: string, path: string) {
 
     if (error || !session) {
       console.log('No active session found');
+      spinner.stop()
       return;
     }
 
@@ -159,6 +166,7 @@ export async function updateSite(siteId: string, path: string) {
     });
     if (!updateReq.ok) {
       const updateRes = await updateReq.json()
+      spinner.stop()
       throw Error("Problem updating site: ", updateRes)
     }
 
@@ -168,16 +176,18 @@ export async function updateSite(siteId: string, path: string) {
 
     return
   } catch (error) {
+    spinner.stop()
     console.log(error)
   }
 }
 
 export async function deleteSite(siteId: string) {
+  const spinner = ora("Deleting site...").start()
   try {
-    const spinner = ora("Deleting site...").start()
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
+      spinner.stop()
       return;
     }
 
@@ -190,6 +200,7 @@ export async function deleteSite(siteId: string) {
 
     if (error || !session) {
       console.log('No active session found');
+      spinner.stop()
       return;
     }
 
@@ -200,10 +211,10 @@ export async function deleteSite(siteId: string) {
         "Content-Type": "application/json",
         "X-Orbiter-Token": tokens.access_token,
       },
-      body: "",
     });
     if (!deleteReq.ok) {
       const deleteRes = await deleteReq.json()
+      spinner.stop()
       throw Error("Problem updating site: ", deleteRes)
     }
 
@@ -213,6 +224,7 @@ export async function deleteSite(siteId: string) {
 
     return
   } catch (error) {
+    spinner.stop()
     console.log(error)
   }
 }
