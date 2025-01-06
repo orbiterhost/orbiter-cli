@@ -1,17 +1,51 @@
-# orbiter-cli
+## orbiter-cli
 
-Usage: orbiter [options] [command]
+A CLI for creating and managing static sites on [Orbiter](https://orbiter.host)
 
-Upload and deploy static sites with Orbiter.host
+> [!WARNING]
+> README is still a work in progress
 
-Options:
-  -V, --version            output the version number
-  -h, --help               display help for command
+Before installing make sure you already have an account; sign up at [app.orbiter.host](https://orbiter.host). 
 
-Commands:
-  login [options]          Login with OAuth
-  create [options] <path>  Upload and create a new site on Orbiter
-  list                     List existing sites for your account
-  update [options] <path>  Update a site with a new file or folder
-  delete <siteId>          Delete an existing site
-  help [command]           display help for command
+## Installation 
+
+The orbiter-cli is an NPM package you can download with manager of choice. 
+
+```
+npm i -g orbiter-cli
+```
+
+Confirm that it was installed successfully by running the main command
+
+```
+orbiter
+```
+
+## Usage 
+
+Running the `orbiter` command will reveal the available subcommands
+
+```
+orbiter
+orbiter <subcommand>
+> Upload and deploy static sites with Orbiter.host
+
+where <subcommand> can be one of:
+
+- login - Login with OAuth
+- create - Upload and create a new site on Orbiter
+- list - List existing sites for your account
+- update - Update a site with a new file or folder
+- delete - Delete an existing site
+
+For more help, try running `orbiter <subcommand> --help`
+``` 
+
+Start by running `login` including your `--provider` of choice (`googlr` or `github`)
+
+```
+orbiter login --provider google
+```
+
+After logging in you can inspect instructions for other commands by using `orbiter <subcommand> --help`
+
