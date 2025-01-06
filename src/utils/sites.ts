@@ -74,7 +74,7 @@ export async function createSite(path: string, subdomain: string) {
       throw Error("Problem creating site:", result)
     }
     spinner.stopAndPersist({
-      text: `Site created: https://${subdomain}.orbiter.host`
+      text: `Site created: https://${subdomain}.orbiter.website`
     })
     return
   } catch (error) {
