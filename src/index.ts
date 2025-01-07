@@ -39,11 +39,12 @@ const createCmd = command({
     path: positional({
       type: string,
       displayName: 'path',
-      description: 'Path to your build directory (e.g., "dist" or "build")',
+      description: 'Path to your build directory (e.g., "dist" or "build") or index.html file',
     }),
     domain: option({
       type: string,
       long: 'domain',
+      short: 'd',
       description: 'Custom domain',
     }),
   },
@@ -128,7 +129,7 @@ const deleteCmd = command({
 const cli = subcommands({
   name: 'orbiter',
   description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter login`,
-  version: '0.1.2',
+  version: '0.1.3',
   cmds: {
     login: loginCmd,
     create: createCmd,
