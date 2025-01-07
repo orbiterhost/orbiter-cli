@@ -74,7 +74,8 @@ export async function createSite(path: string, subdomain: string) {
     if (!createReq.ok) {
       const result = await createReq.json()
       spinner.stop()
-      throw Error("Problem creating site:", result)
+      console.error("Problem creating site:", result)
+      return
     }
     spinner.stopAndPersist({
       text: `Site created: https://${subdomain}.orbiter.website`
@@ -118,6 +119,11 @@ export async function listSites() {
       },
     });
     const result = await siteReq.json()
+    if (!siteReq.ok) {
+      spinner.stop()
+      console.error("Problem fetching sites: ", result)
+      return
+    }
     spinner.stop()
     console.log(result)
     return result
@@ -167,7 +173,8 @@ export async function updateSite(siteId: string, path: string) {
     if (!updateReq.ok) {
       const updateRes = await updateReq.json()
       spinner.stop()
-      throw Error("Problem updating site: ", updateRes)
+      console.error("Problem updating site: ", updateRes)
+      return
     }
 
     spinner.stopAndPersist({
@@ -215,7 +222,8 @@ export async function deleteSite(siteId: string) {
     if (!deleteReq.ok) {
       const deleteRes = await deleteReq.json()
       spinner.stop()
-      throw Error("Problem updating site: ", deleteRes)
+      console.error("Problem updating site: ", deleteRes)
+      return
     }
 
     spinner.stopAndPersist({
@@ -226,5 +234,6 @@ export async function deleteSite(siteId: string) {
   } catch (error) {
     spinner.stop()
     console.log(error)
+    return
   }
 }
