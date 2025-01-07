@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2025-01-07
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Improved error messages
+
 ## [0.1.1] - 2025-01-06
 
 ### ⚙️ Miscellaneous Tasks
