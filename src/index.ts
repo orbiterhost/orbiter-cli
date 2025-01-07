@@ -1,4 +1,4 @@
-import { command, subcommands, run, binary, string, option, positional } from 'cmd-ts';
+import { command, subcommands, run, binary, string, option, positional, optional } from 'cmd-ts';
 import { login } from './utils/auth';
 import { createSite, deleteSite, listSites, updateSite } from './utils/sites';
 import figlet from "figlet"
@@ -19,6 +19,7 @@ const loginCmd = command({
     provider: option({
       type: string,
       long: 'provider',
+      short: 'p',
       description: 'Choose the OAuth provider you want to login with (github | google)',
     }),
   },
@@ -58,9 +59,17 @@ const createCmd = command({
 const listCmd = command({
   name: 'list',
   description: 'List existing sites for your account',
-  args: {},
-  handler: async () => {
-    await listSites();
+  args: {
+    domain: option({
+      type: optional(string),
+      long: 'domain',
+      short: 'd',
+      description: 'Filter by exact subdomain',
+      defaultValue: undefined
+    }),
+  },
+  handler: async (args) => {
+    await listSites(args.domain);
   },
 });
 
@@ -74,17 +83,26 @@ const updateCmd = command({
       description: 'Path to your build directory (e.g., "dist" or "build")',
     }),
     siteId: option({
-      type: string,
+      type: optional(string),
       long: 'siteId',
+      short: 's',
       description: 'ID of the target site',
+      defaultValue: undefined
+    }),
+    domain: option({
+      type: optional(string),
+      long: 'domain',
+      short: 'd',
+      description: 'Domain of the target site',
+      defaultValue: undefined
     }),
   },
   handler: async (args) => {
-    if (!args.siteId) {
-      console.log("Please provide the site ID you want to update (use `orbiter list` to see your sites): `orbiter update --sideId <siteId> /path/to/folder`");
+    if (!args.siteId && !args.domain) {
+      console.log("Provide either the --siteId or the --domain of the site you want to update. Use orbiter list to see both of these!");
       return;
     }
-    await updateSite(args.siteId, args.path);
+    await updateSite(args.path, args.siteId, args.domain);
   },
 });
 

@@ -87,7 +87,7 @@ export async function createSite(path: string, subdomain: string) {
   }
 }
 
-export async function listSites() {
+export async function listSites(domain?: string) {
   const spinner = ora("Fetching sites...").start()
   try {
 
@@ -107,6 +107,27 @@ export async function listSites() {
     if (error || !session) {
       console.log('No active session found');
       return;
+    }
+
+    if (domain) {
+      const memberships: any = await getOrgMemebershipsForUser()
+      const orgId = memberships[0].organizations.id
+      const siteReq = await fetch(`${API_URL}/organizations/${orgId}/sites?domain=${domain}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Orbiter-Token": tokens.access_token,
+        },
+      });
+      const result = await siteReq.json()
+      if (!siteReq.ok) {
+        spinner.stop()
+        console.error("Problem fetching sites: ", result)
+        return
+      }
+      spinner.stop()
+      console.log(result)
+      return result
     }
 
     const memberships: any = await getOrgMemebershipsForUser()
@@ -135,9 +156,10 @@ export async function listSites() {
 }
 
 
-export async function updateSite(siteId: string, path: string) {
+export async function updateSite(path: string, siteId?: string, domain?: string) {
   const spinner = ora("Updating site...").start()
   try {
+    let id: string | undefined = siteId
     const upload = await uploadSite(path)
     const tokens = await getValidTokens();
     if (!tokens) {
@@ -159,7 +181,21 @@ export async function updateSite(siteId: string, path: string) {
       return;
     }
 
-    const updateReq = await fetch(`${API_URL}/sites/${siteId}`, {
+    if (domain) {
+      const memberships: any = await getOrgMemebershipsForUser()
+      const orgId = memberships[0].organizations.id
+      const siteReq = await fetch(`${API_URL}/organizations/${orgId}/sites?domain=${domain}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Orbiter-Token": tokens.access_token,
+        },
+      });
+      const result = await siteReq.json()
+      id = result.data[0].id
+    }
+
+    const updateReq = await fetch(`${API_URL}/sites/${id}`, {
       method: "PUT",
       //  @ts-ignore
       headers: {
