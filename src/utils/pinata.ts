@@ -9,57 +9,69 @@ const pinata = new PinataSDK({
 })
 
 async function upload(filePath: string, key: string, userId: string) {
-  const distPath = path.join(process.cwd(), filePath);
+  const absolutePath = path.join(process.cwd(), filePath);
   const files: File[] = [];
 
-  function readDirRecursively(dir: string) {
-    try {
-      const items = fs.readdirSync(dir);
+  // Check if path is a file or directory
+  const stats = fs.statSync(absolutePath);
 
-      for (const item of items) {
-        const fullPath = path.join(dir, item);
-        const stat = fs.statSync(fullPath);
+  if (stats.isFile()) {
+    // Handle single file
+    const fileContent = fs.readFileSync(absolutePath);
+    const file = new File([fileContent], path.basename(absolutePath));
+    files.push(file);
+  } else if (stats.isDirectory()) {
+    // Handle directory
+    function readDirRecursively(dir: string) {
+      try {
+        const items = fs.readdirSync(dir);
 
-        if (stat.isDirectory()) {
-          readDirRecursively(fullPath);
-        } else {
-          const fileContent = fs.readFileSync(fullPath);
-          const relativePath = path.relative(distPath, fullPath);
-          const file = new File([fileContent], relativePath);
-          files.push(file);
+        for (const item of items) {
+          const fullPath = path.join(dir, item);
+          const stat = fs.statSync(fullPath);
+
+          if (stat.isDirectory()) {
+            readDirRecursively(fullPath);
+          } else {
+            const fileContent = fs.readFileSync(fullPath);
+            const relativePath = path.relative(absolutePath, fullPath);
+            const file = new File([fileContent], relativePath);
+            files.push(file);
+          }
         }
+      } catch (error) {
+        console.error(`Error reading directory ${dir}:`, error);
+        throw error;
       }
-    } catch (error) {
-      console.error(`Error reading directory ${dir}:`, error);
-      throw error;
     }
-  }
 
-  // Call readDirRecursively before checking files.length
-  readDirRecursively(distPath);
-
-  let result;
-  if (files.length > 1) {
-    result = await pinata.upload.fileArray(files)
-      .key(key)
-      .group("c5e8c379-e7c1-4c43-a2e9-79597d477481")
-      .addMetadata({
-        keyValues: {
-          userId: userId
-        }
-      });
-  } else if (files.length === 1) {
-    result = await pinata.upload.file(files[0])
-      .key(key)
-      .group("c5e8c379-e7c1-4c43-a2e9-79597d477481")
-      .addMetadata({
-        keyValues: {
-          userId: userId
-        }
-      });
+    readDirRecursively(absolutePath);
   } else {
-    throw new Error(`No files found to upload in directory: ${distPath}`);
+    throw new Error(`Path ${absolutePath} is neither a file nor a directory`);
   }
+
+  if (files.length === 0) {
+    throw new Error(`No files found to upload at path: ${absolutePath}`);
+  }
+
+  // Upload files
+  const result = files.length === 1
+    ? await pinata.upload.file(files[0])
+      .key(key)
+      .group("c5e8c379-e7c1-4c43-a2e9-79597d477481")
+      .addMetadata({
+        keyValues: {
+          userId: userId
+        }
+      })
+    : await pinata.upload.fileArray(files)
+      .key(key)
+      .group("c5e8c379-e7c1-4c43-a2e9-79597d477481")
+      .addMetadata({
+        keyValues: {
+          userId: userId
+        }
+      });
 
   return result;
 }
