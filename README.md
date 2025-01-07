@@ -44,7 +44,7 @@ For more help, try running `orbiter <subcommand> --help`
 
 ### `login`
 
-Start by running `login` including your `--provider` of choice (`google` or `github`)
+Start by running `login` including your `--provider` (shorthand `-p`) of choice (`google` or `github`)
 
 ```
 orbiter login --provider google
@@ -52,7 +52,7 @@ orbiter login --provider google
 
 ### `create`
 
-Uploads and create a new site on Orbiter. Must include the `--domain` for the default subdomain of the site. After providing a name give the path to the file or folder of the website you are creating, must contain an `index.html` file.
+Uploads and create a new site on Orbiter. Must include the `--domain` or `-d` for the default subdomain of the site. After providing a name give the path to the file or folder of the website you are creating, must contain an `index.html` file.
 
 ```
 orbiter create --domain mysite ./dist
@@ -66,7 +66,7 @@ Site created: https://mysite.orbiter.website
 
 ### `list`
 
-List all sites currently on your Orbiter account.
+List all sites currently on your Orbiter account. You can filter by domain with `-d` followed by the subdomain of the site.
 
 > [!TIP]
 > Use this command to get the site ID for a site you want to update
@@ -99,10 +99,12 @@ This will return the following JSON response from the API:
 
 ### `update`
 
-Update an existing site with a file or folder. Requires passing in the `--siteId` which can be obtained by using `orbiter list`.
+Update an existing site with a file or folder. You can target a site with either the `--siteId | -s` or the `--domain | -d` (subdomain) followed by the updated folder or file. Both the subdomain and site ID can be found by using `orbiter list`.
 
 ```
 orbiter update --siteId a5dae6af-ad43-4bb3-bdab-3a4d41b573cc ./new-dist
+
+orbiter update --domain astro-demo ./new-dist
 ```
 
 ### `delete`
