@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.3] - 2025-01-07
+
+### 🚀 Features
+
+- Added domain filtering for listing and updating files
+
+### 🐛 Bug Fixes
+
+- Fixed approach for traversing files
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Update package-lock.json
+- Version bump and small flag improvements
+
 ## [0.1.2] - 2025-01-07
 
 ### ⚙️ Miscellaneous Tasks
