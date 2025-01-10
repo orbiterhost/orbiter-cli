@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2025-01-10
+
+### 🚀 Features
+
+- Added versions and rollbacks
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog
+- Update Readme
+
 ## [0.1.3] - 2025-01-07
 
 ### 🚀 Features
