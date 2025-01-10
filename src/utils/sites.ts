@@ -273,3 +273,111 @@ export async function deleteSite(siteId: string) {
     return
   }
 }
+
+export async function listVersions(domain: string) {
+  const spinner = ora("Fetching versions...").start()
+  try {
+
+    const tokens = await getValidTokens();
+    if (!tokens) {
+      console.log('Please login first');
+      return;
+    }
+
+    await supabase.auth.setSession({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token
+    });
+
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session) {
+      console.log('No active session found');
+      return;
+    }
+    const siteReq = await fetch(`${API_URL}/sites/${domain}.orbiter.website/versions`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Orbiter-Token": tokens.access_token,
+      },
+    });
+    const result = await siteReq.json()
+    if (!siteReq.ok) {
+      spinner.stop()
+      console.error("Problem fetching versions: ", result)
+      return
+    }
+    spinner.stop()
+    console.log(result)
+    return result
+
+  } catch (error) {
+    spinner.stop()
+    console.log(error)
+  }
+}
+
+export async function rollbackSite(domain: string, cid: string) {
+  const spinner = ora("Rolling back site...").start()
+  try {
+    const tokens = await getValidTokens();
+    if (!tokens) {
+      console.log('Please login first');
+      spinner.stop()
+      return;
+    }
+
+    await supabase.auth.setSession({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token
+    });
+
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session) {
+      console.log('No active session found');
+      spinner.stop()
+      return;
+    }
+
+    const memberships: any = await getOrgMemebershipsForUser()
+    const orgId = memberships[0].organizations.id
+    const siteReq = await fetch(`${API_URL}/organizations/${orgId}/sites?domain=${domain}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Orbiter-Token": tokens.access_token,
+      },
+    });
+    const result = await siteReq.json()
+    const id = result.data[0].id
+
+    const updateReq = await fetch(`${API_URL}/sites/${id}`, {
+      method: "PUT",
+      //  @ts-ignore
+      headers: {
+        "Content-Type": "application/json",
+        "X-Orbiter-Token": tokens.access_token,
+      },
+      body: JSON.stringify({
+        cid: cid,
+      }),
+    });
+    if (!updateReq.ok) {
+      const updateRes = await updateReq.json()
+      spinner.stop()
+      console.error("Problem rolling back site: ", updateRes)
+      return
+    }
+
+    spinner.stopAndPersist({
+      text: `Rollback Complete`
+    })
+
+    return
+  } catch (error) {
+    spinner.stop()
+    console.log(error)
+  }
+}

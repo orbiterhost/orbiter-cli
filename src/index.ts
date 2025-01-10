@@ -1,6 +1,6 @@
 import { command, subcommands, run, binary, string, option, positional, optional } from 'cmd-ts';
 import { login } from './utils/auth';
-import { createSite, deleteSite, listSites, updateSite } from './utils/sites';
+import { createSite, deleteSite, listSites, listVersions, rollbackSite, updateSite } from './utils/sites';
 import figlet from "figlet"
 
 const text =
@@ -74,6 +74,42 @@ const listCmd = command({
   },
 });
 
+const versionsCmd = command({
+  name: 'versions',
+  description: 'List versions of your website',
+  args: {
+    domain: positional({
+      type: string,
+      displayName: 'domain',
+      description: 'Subdomain for your site, <domain>.orbiter.website',
+    }),
+  },
+  handler: async (args) => {
+    await listVersions(args.domain);
+  },
+});
+
+const rollbackCmd = command({
+  name: 'rollback',
+  description: 'Rollback a site to a previous version',
+  args: {
+    domain: positional({
+      type: string,
+      displayName: 'domain',
+      description: 'Subdomain for your site, <domain>.orbiter.website',
+    }),
+    cid: positional({
+      type: string,
+      displayName: 'cid',
+      description: 'CID of the version you want to roll back to. Use the `versions` command to fetch this information',
+    }),
+  },
+  handler: async (args) => {
+    await rollbackSite(args.domain, args.cid);
+  },
+});
+
+
 const updateCmd = command({
   name: 'update',
   description: 'Update a site with a new file or folder',
@@ -129,12 +165,14 @@ const deleteCmd = command({
 const cli = subcommands({
   name: 'orbiter',
   description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter login`,
-  version: '0.1.3',
+  version: '0.2.0',
   cmds: {
     login: loginCmd,
     create: createCmd,
     list: listCmd,
     update: updateCmd,
+    versions: versionsCmd,
+    rollback: rollbackCmd,
     delete: deleteCmd,
   },
 });
