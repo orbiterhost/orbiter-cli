@@ -107,6 +107,42 @@ orbiter update --siteId a5dae6af-ad43-4bb3-bdab-3a4d41b573cc ./new-dist
 orbiter update --domain astro-demo ./new-dist
 ```
 
+### `versions`
+
+List previous versions of a site for a given subdomain, ie `<subdomain>.orbiter.website`. the `cid` listed in the response can be used in `rollback` to rollback a site to a previous version.
+
+```
+orbiter versions <subdomain>
+```
+
+This will return the following object
+
+```typescript
+{
+  data: [
+    {
+      id: 'string',
+      site_id: 'string',
+      created_at: 'string',
+      organization_id: 'string',
+      cid: 'string',
+      domain: 'string',
+      site_contract: 'string',
+      version_number: number,
+      deployed_by: 'string'
+    },
+  ]
+}
+```
+
+### `rollback`
+
+Rollback a site to a previous version using the `subdomain` and the `cid` of the previous version to update it. Use `versions` to get the previous versions for a site.
+
+```
+orbiter rollback <subdomain> <cid>
+```
+
 ### `delete`
 
 Delete an existing site using the site ID which can be obtained by using `orbiter list`
