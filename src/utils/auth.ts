@@ -1,11 +1,14 @@
 import { createClient, type Provider } from '@supabase/supabase-js'
 import { SUPABASE_CONFIG } from "../config"
+//@ts-ignore
 import express from 'express'
 import open from 'open'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import ora, { type Ora } from 'ora'
+import inquirer from 'inquirer';
+import { getOrgMemebershipsForUser } from './db'
 
 let spinner: Ora
 
@@ -16,6 +19,13 @@ export const supabase = createClient(
 )
 
 const TOKEN_FILE = path.join(os.homedir(), '.orbiter.json')
+const ORG_FILE = path.join(os.homedir(), '.orbiter-org.json');
+
+interface OrgData {
+  id: string;
+  name: string;
+  selected_at: string;
+}
 
 interface TokenData {
   access_token: string;
@@ -23,7 +33,29 @@ interface TokenData {
   created_at: string;
 }
 
-const isTokenExpired = (created_at: string): boolean => {
+export function storeSelectedOrg(orgId: string, orgName: string) {
+  const orgData: OrgData = {
+    id: orgId,
+    name: orgName,
+    selected_at: new Date().toISOString()
+  };
+  fs.writeFileSync(ORG_FILE, JSON.stringify(orgData, null, 2));
+};
+
+export function getSelectedOrg(): OrgData | undefined {
+  try {
+    if (fs.existsSync(ORG_FILE)) {
+      const data = fs.readFileSync(ORG_FILE, 'utf8');
+      return JSON.parse(data) as OrgData;
+    }
+    return undefined;
+  } catch (error) {
+    console.error('Error reading org file:', error);
+    return undefined;
+  }
+};
+
+function isTokenExpired(created_at: string): boolean {
   const tokenDate = new Date(created_at);
   const now = new Date();
   // Tokens typically expire in 1 hour, so we'll refresh if it's older than 55 minutes
@@ -92,7 +124,7 @@ export async function getValidTokens(): Promise<TokenData | null> {
 
 
 // Add function to store tokens
-const storeTokens = (accessToken: string, refreshToken: string) => {
+function storeTokens(accessToken: string, refreshToken: string) {
   const tokens: TokenData = {
     access_token: accessToken,
     refresh_token: refreshToken,
@@ -103,7 +135,7 @@ const storeTokens = (accessToken: string, refreshToken: string) => {
 };
 
 // Add function to get stored tokens
-const getStoredTokens = (): TokenData | undefined => {
+function getStoredTokens(): TokenData | undefined {
   try {
     if (fs.existsSync(TOKEN_FILE)) {
       const data = fs.readFileSync(TOKEN_FILE, 'utf8');
@@ -196,6 +228,12 @@ export async function login(provider: Provider) {
           return;
         }
 
+        const memberships = await getOrgMemebershipsForUser();
+        if (memberships && memberships.length > 0) {
+          const defaultOrg = memberships[0].organizations;
+          storeSelectedOrg(defaultOrg.id, defaultOrg.name);
+        }
+
         storeTokens(accessToken, refreshToken);
 
         spinner.stopAndPersist({
@@ -239,5 +277,44 @@ export async function login(provider: Provider) {
     console.error('Error during login:', error);
     process.exit(1);
   }
+
+}
+
+export async function selectOrg() {
+  const tokens = await getValidTokens();
+  if (!tokens) {
+    console.log('Please login first');
+    return;
+  }
+
+  await supabase.auth.setSession({
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token
+  });
+
+  const memberships = await getOrgMemebershipsForUser();
+  if (!memberships || memberships.length === 0) {
+    console.log('No organizations found');
+    return;
+  }
+
+  const currentOrg = getSelectedOrg();
+
+  const choices = memberships.map((membership: any) => ({
+    name: `${membership.organizations.name}${currentOrg?.id === membership.organizations.id ? ' (current)' : ''}`,
+    value: membership.organizations
+  }));
+
+  const { organization } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'organization',
+      message: 'Select an organization:',
+      choices
+    }
+  ]);
+
+  storeSelectedOrg(organization.id, organization.name);
+  console.log(`Selected organization: ${organization.name}`);
 
 }

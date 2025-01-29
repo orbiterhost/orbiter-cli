@@ -1,7 +1,9 @@
 import { command, subcommands, run, binary, string, option, positional, optional } from 'cmd-ts';
-import { login } from './utils/auth';
+import { login, selectOrg } from './utils/auth';
 import { createSite, deleteSite, listSites, listVersions, rollbackSite, updateSite } from './utils/sites';
+//@ts-ignore
 import figlet from "figlet"
+
 
 const text =
   figlet.textSync("ORBITER", {
@@ -162,12 +164,22 @@ const deleteCmd = command({
   },
 });
 
+const orgCmd = command({
+  name: 'orgs',
+  description: 'List and select organization',
+  args: {},
+  handler: async () => {
+    await selectOrg()
+  }
+});
+
 const cli = subcommands({
   name: 'orbiter',
   description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter login`,
   version: '0.2.0',
   cmds: {
     login: loginCmd,
+    orgs: orgCmd,
     create: createCmd,
     list: listCmd,
     update: updateCmd,

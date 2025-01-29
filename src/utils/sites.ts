@@ -3,33 +3,9 @@ import { uploadSite } from "./pinata";
 import dotenv from "dotenv";
 import { API_URL } from "../config"
 import ora from "ora";
-
+import { getSelectedOrg } from './auth';
 
 dotenv.config()
-
-const getOrgMemebershipsForUser = async () => {
-  const { data: memberships, error } = await supabase
-    .from("members")
-    .select(
-      `
-      *,
-      organizations (
-        id,
-        name,
-        created_at
-      )
-    `
-    )
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Error fetching memberships:", error);
-    return;
-  }
-
-  return memberships;
-};
-
 
 export async function createSite(path: string, subdomain: string) {
   const spinner = ora("Creating site...").start()
@@ -57,7 +33,12 @@ export async function createSite(path: string, subdomain: string) {
       return;
     }
 
-    const memberships: any = await getOrgMemebershipsForUser()
+    const selectedOrg = getSelectedOrg();
+    if (!selectedOrg) {
+      console.log('No organization selected. Please run "orbiter org" first');
+      spinner.stop();
+      return;
+    }
 
     const createReq = await fetch(`${API_URL}/sites`, {
       method: "POST",
@@ -66,7 +47,7 @@ export async function createSite(path: string, subdomain: string) {
         "X-Orbiter-Token": tokens.access_token,
       },
       body: JSON.stringify({
-        orgId: memberships[0].organizations.id,
+        orgId: selectedOrg.id,
         cid: upload?.IpfsHash,
         subdomain: subdomain,
       }),
@@ -109,10 +90,15 @@ export async function listSites(domain?: string) {
       return;
     }
 
+    const selectedOrg = getSelectedOrg();
+    if (!selectedOrg) {
+      console.log('No organization selected. Please run "orbiter org" first');
+      spinner.stop();
+      return;
+    }
+
     if (domain) {
-      const memberships: any = await getOrgMemebershipsForUser()
-      const orgId = memberships[0].organizations.id
-      const siteReq = await fetch(`${API_URL}/organizations/${orgId}/sites?domain=${domain}`, {
+      const siteReq = await fetch(`${API_URL}/organizations/${selectedOrg.id}/sites?domain=${domain}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -130,9 +116,7 @@ export async function listSites(domain?: string) {
       return result
     }
 
-    const memberships: any = await getOrgMemebershipsForUser()
-    const orgId = memberships[0].organizations.id
-    const siteReq = await fetch(`${API_URL}/organizations/${orgId}/sites`, {
+    const siteReq = await fetch(`${API_URL}/organizations/${selectedOrg.id}/sites`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -181,10 +165,15 @@ export async function updateSite(path: string, siteId?: string, domain?: string)
       return;
     }
 
+    const selectedOrg = getSelectedOrg();
+    if (!selectedOrg) {
+      console.log('No organization selected. Please run "orbiter org" first');
+      spinner.stop();
+      return;
+    }
+
     if (domain) {
-      const memberships: any = await getOrgMemebershipsForUser()
-      const orgId = memberships[0].organizations.id
-      const siteReq = await fetch(`${API_URL}/organizations/${orgId}/sites?domain=${domain}`, {
+      const siteReq = await fetch(`${API_URL}/organizations/${selectedOrg.id}/sites?domain=${domain}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -341,9 +330,14 @@ export async function rollbackSite(domain: string, cid: string) {
       return;
     }
 
-    const memberships: any = await getOrgMemebershipsForUser()
-    const orgId = memberships[0].organizations.id
-    const siteReq = await fetch(`${API_URL}/organizations/${orgId}/sites?domain=${domain}`, {
+    const selectedOrg = getSelectedOrg();
+    if (!selectedOrg) {
+      console.log('No organization selected. Please run "orbiter org" first');
+      spinner.stop();
+      return;
+    }
+
+    const siteReq = await fetch(`${API_URL}/organizations/${selectedOrg.id}/sites?domain=${domain}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
