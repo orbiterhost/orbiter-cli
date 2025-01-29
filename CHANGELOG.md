@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2025-01-29
+
+### 🚀 Features
+
+- Added orgs command
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Update readme
+
 ## [0.2.0] - 2025-01-10
 
 ### 🚀 Features
