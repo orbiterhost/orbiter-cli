@@ -98,7 +98,7 @@ export async function listSites(domain?: string) {
     }
 
     if (domain) {
-      const siteReq = await fetch(`${API_URL}/organizations/${selectedOrg.id}/sites?domain=${domain}`, {
+      const siteReq = await fetch(`${API_URL}/sites?domain=${domain}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -116,7 +116,7 @@ export async function listSites(domain?: string) {
       return result
     }
 
-    const siteReq = await fetch(`${API_URL}/organizations/${selectedOrg.id}/sites`, {
+    const siteReq = await fetch(`${API_URL}/sites`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -173,7 +173,7 @@ export async function updateSite(path: string, siteId?: string, domain?: string)
     }
 
     if (domain) {
-      const siteReq = await fetch(`${API_URL}/organizations/${selectedOrg.id}/sites?domain=${domain}`, {
+      const siteReq = await fetch(`${API_URL}/sites?domain=${domain}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -337,7 +337,7 @@ export async function rollbackSite(domain: string, cid: string) {
       return;
     }
 
-    const siteReq = await fetch(`${API_URL}/organizations/${selectedOrg.id}/sites?domain=${domain}`, {
+    const siteReq = await fetch(`${API_URL}/sites?domain=${domain}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

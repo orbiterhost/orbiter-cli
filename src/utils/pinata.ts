@@ -97,7 +97,7 @@ export async function uploadSite(filePath: string) {
       return;
     }
 
-    const keyReq = await fetch("https://api.orbiter.host/keys", {
+    const keyReq = await fetch("https://api.orbiter.host/keys/upload_key", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
