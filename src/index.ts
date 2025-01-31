@@ -176,7 +176,7 @@ const orgCmd = command({
 const cli = subcommands({
   name: 'orbiter',
   description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter login`,
-  version: '0.2.0',
+  version: '0.3.1',
   cmds: {
     login: loginCmd,
     orgs: orgCmd,
