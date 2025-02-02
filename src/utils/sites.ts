@@ -20,34 +20,31 @@ export async function createSite(path: string, subdomain: string) {
       return;
     }
 
-    await supabase.auth.setSession({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token
-    });
+    if (tokens.keyType === "oauth") {
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+      await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token as string
+      });
 
-    if (error || !session) {
-      console.log('No active session found');
-      spinner.stop()
-      return;
-    }
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-    const selectedOrg = getSelectedOrg();
-    if (!selectedOrg) {
-      console.log('No organization selected. Please run "orbiter org" first');
-      spinner.stop();
-      return;
+      if (error || !session) {
+        console.log('No active session found');
+        spinner.stop()
+        return;
+      }
     }
 
     const createReq = await fetch(`${API_URL}/sites`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Orbiter-Token": tokens.access_token,
+        ...(tokens.keyType === 'apikey'
+          ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+          : { "X-Orbiter-Token": tokens.access_token })
       },
       body: JSON.stringify({
-        orgId: selectedOrg.id,
         cid: upload?.IpfsHash,
         subdomain: subdomain,
       }),
@@ -75,26 +72,24 @@ export async function listSites(domain?: string) {
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
+      spinner.stop()
       return;
     }
 
-    await supabase.auth.setSession({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token
-    });
+    if (tokens.keyType === "oauth") {
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+      await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token as string
+      });
 
-    if (error || !session) {
-      console.log('No active session found');
-      return;
-    }
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-    const selectedOrg = getSelectedOrg();
-    if (!selectedOrg) {
-      console.log('No organization selected. Please run "orbiter org" first');
-      spinner.stop();
-      return;
+      if (error || !session) {
+        console.log('No active session found');
+        spinner.stop()
+        return;
+      }
     }
 
     if (domain) {
@@ -102,7 +97,9 @@ export async function listSites(domain?: string) {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "X-Orbiter-Token": tokens.access_token,
+          ...(tokens.keyType === 'apikey'
+            ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+            : { "X-Orbiter-Token": tokens.access_token })
         },
       });
       const result = await siteReq.json()
@@ -120,7 +117,9 @@ export async function listSites(domain?: string) {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "X-Orbiter-Token": tokens.access_token,
+        ...(tokens.keyType === 'apikey'
+          ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+          : { "X-Orbiter-Token": tokens.access_token })
       },
     });
     const result = await siteReq.json()
@@ -152,24 +151,19 @@ export async function updateSite(path: string, siteId?: string, domain?: string)
       return;
     }
 
-    await supabase.auth.setSession({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token
-    });
+    if (tokens.keyType === "oauth") {
+      await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token as string
+      });
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-    if (error || !session) {
-      console.log('No active session found');
-      spinner.stop()
-      return;
-    }
-
-    const selectedOrg = getSelectedOrg();
-    if (!selectedOrg) {
-      console.log('No organization selected. Please run "orbiter org" first');
-      spinner.stop();
-      return;
+      if (error || !session) {
+        console.log('No active session found');
+        spinner.stop()
+        return;
+      }
     }
 
     if (domain) {
@@ -189,7 +183,9 @@ export async function updateSite(path: string, siteId?: string, domain?: string)
       //  @ts-ignore
       headers: {
         "Content-Type": "application/json",
-        "X-Orbiter-Token": tokens.access_token,
+        ...(tokens.keyType === 'apikey'
+          ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+          : { "X-Orbiter-Token": tokens.access_token })
       },
       body: JSON.stringify({
         cid: upload?.IpfsHash,
@@ -223,17 +219,19 @@ export async function deleteSite(siteId: string) {
       return;
     }
 
-    await supabase.auth.setSession({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token
-    });
+    if (tokens.keyType === "oauth") {
+      await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token as string
+      });
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-    if (error || !session) {
-      console.log('No active session found');
-      spinner.stop()
-      return;
+      if (error || !session) {
+        console.log('No active session found');
+        spinner.stop()
+        return;
+      }
     }
 
     const deleteReq = await fetch(`${API_URL}/sites/${siteId}`, {
@@ -241,7 +239,9 @@ export async function deleteSite(siteId: string) {
       //	@ts-ignore
       headers: {
         "Content-Type": "application/json",
-        "X-Orbiter-Token": tokens.access_token,
+        ...(tokens.keyType === 'apikey'
+          ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+          : { "X-Orbiter-Token": tokens.access_token })
       },
     });
     if (!deleteReq.ok) {
@@ -273,22 +273,27 @@ export async function listVersions(domain: string) {
       return;
     }
 
-    await supabase.auth.setSession({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token
-    });
+    if (tokens.keyType === "oauth") {
+      await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token as string
+      });
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-    if (error || !session) {
-      console.log('No active session found');
-      return;
+      if (error || !session) {
+        console.log('No active session found');
+        return;
+      }
     }
+
     const siteReq = await fetch(`${API_URL}/sites/${domain}.orbiter.website/versions`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "X-Orbiter-Token": tokens.access_token,
+        ...(tokens.keyType === 'apikey'
+          ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+          : { "X-Orbiter-Token": tokens.access_token })
       },
     });
     const result = await siteReq.json()
@@ -317,24 +322,20 @@ export async function rollbackSite(domain: string, cid: string) {
       return;
     }
 
-    await supabase.auth.setSession({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token
-    });
+    if (tokens.keyType === "oauth") {
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+      await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token as string
+      });
 
-    if (error || !session) {
-      console.log('No active session found');
-      spinner.stop()
-      return;
-    }
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-    const selectedOrg = getSelectedOrg();
-    if (!selectedOrg) {
-      console.log('No organization selected. Please run "orbiter org" first');
-      spinner.stop();
-      return;
+      if (error || !session) {
+        console.log('No active session found');
+        spinner.stop()
+        return;
+      }
     }
 
     const siteReq = await fetch(`${API_URL}/sites?domain=${domain}`, {

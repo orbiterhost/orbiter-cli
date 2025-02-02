@@ -12,7 +12,6 @@ import { getOrgMemebershipsForUser } from './db'
 
 let spinner: Ora
 
-
 export const supabase = createClient(
   SUPABASE_CONFIG.URL as string,
   SUPABASE_CONFIG.ANON_KEY as string
@@ -29,8 +28,66 @@ interface OrgData {
 
 interface TokenData {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string;
   created_at: string;
+  keyType: 'oauth' | 'apikey';
+}
+
+export async function authenticateWithApiKey(providedKey?: string) {
+  try {
+    let apiKey: string;
+
+    if (providedKey) {
+      apiKey = providedKey;
+    } else {
+      const response = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'apiKey',
+          message: 'Please enter your API key:',
+          validate: (input) => input.length > 0 || 'API key cannot be empty'
+        }
+      ]);
+      apiKey = response.apiKey;
+    }
+
+    // Verify the API key by making a test request
+    const testResponse = await fetch(`https://api.orbiter.host/sites`, {
+      headers: {
+        'X-Orbiter-API-Key': `${apiKey}`
+      }
+    });
+
+    if (!testResponse.ok) {
+      console.error('Invalid API key');
+      return;
+    }
+
+    // Store the API key
+    const tokens: TokenData = {
+      access_token: apiKey,
+      created_at: new Date().toISOString(),
+      keyType: 'apikey'
+    };
+
+    fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
+    console.log('API key stored successfully');
+
+    // // Get and store org information if available
+    // const orgResponse = await fetch(`${API_URL}/org`, {
+    //   headers: {
+    //     'Authorization': `Bearer ${apiKey}`
+    //   }
+    // });
+
+    // if (orgResponse.ok) {
+    //   const orgData = await orgResponse.json();
+    //   storeSelectedOrg(orgData.id, orgData.name);
+    // }
+
+  } catch (error) {
+    console.error('Error storing API key:', error);
+  }
 }
 
 export function storeSelectedOrg(orgId: string, orgName: string) {
@@ -55,13 +112,17 @@ export function getSelectedOrg(): OrgData | undefined {
   }
 };
 
-function isTokenExpired(created_at: string): boolean {
-  const tokenDate = new Date(created_at);
+function isTokenExpired(tokenData: TokenData): boolean {
+  // API keys don't expire
+  if (tokenData.keyType === 'apikey') {
+    return false;
+  }
+
+  const tokenDate = new Date(tokenData.created_at);
   const now = new Date();
-  // Tokens typically expire in 1 hour, so we'll refresh if it's older than 55 minutes
   const diffInMinutes = (now.getTime() - tokenDate.getTime()) / (1000 * 60);
   return diffInMinutes > 55;
-};
+}
 
 // Function to refresh the token
 export async function refreshToken(): Promise<TokenData | null> {
@@ -72,13 +133,13 @@ export async function refreshToken(): Promise<TokenData | null> {
     return null;
   }
 
-  if (!isTokenExpired(storedTokens.created_at)) {
+  if (!isTokenExpired(storedTokens)) {
     return storedTokens;
   }
 
   try {
     const { data, error } = await supabase.auth.refreshSession({
-      refresh_token: storedTokens.refresh_token
+      refresh_token: storedTokens.refresh_token as string
     });
 
     if (error) {
@@ -91,13 +152,14 @@ export async function refreshToken(): Promise<TokenData | null> {
       return null;
     }
 
-    const newTokens = {
+    const newTokens: TokenData = {
       access_token: data.session.access_token,
       refresh_token: data.session.refresh_token,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      keyType: 'oauth'
     };
 
-    storeTokens(newTokens.access_token, newTokens.refresh_token);
+    storeTokens(newTokens.access_token, newTokens.refresh_token, "oauth");
     return newTokens;
 
   } catch (error) {
@@ -110,11 +172,17 @@ export async function getValidTokens(): Promise<TokenData | null> {
   const storedTokens = getStoredTokens();
 
   if (!storedTokens) {
-    console.log('No stored tokens found. Please login first.');
+    console.log('No stored tokens found. Please login or authenticate with an API key.');
     return null;
   }
 
-  if (isTokenExpired(storedTokens.created_at)) {
+  // If it's an API key, just return it
+  if (storedTokens.keyType === 'apikey') {
+    return storedTokens;
+  }
+
+  // Otherwise handle OAuth token refresh
+  if (isTokenExpired(storedTokens)) {
     return await refreshToken();
   }
 
@@ -122,17 +190,17 @@ export async function getValidTokens(): Promise<TokenData | null> {
 }
 
 
-
 // Add function to store tokens
-function storeTokens(accessToken: string, refreshToken: string) {
+function storeTokens(accessToken: string, refreshToken?: string, keyType: 'oauth' | 'apikey' = 'oauth') {
   const tokens: TokenData = {
     access_token: accessToken,
     refresh_token: refreshToken,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    keyType
   };
 
   fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
-};
+}
 
 // Add function to get stored tokens
 function getStoredTokens(): TokenData | undefined {
@@ -228,13 +296,7 @@ export async function login(provider: Provider) {
           return;
         }
 
-        const memberships = await getOrgMemebershipsForUser();
-        if (memberships && memberships.length > 0) {
-          const defaultOrg = memberships[0].organizations;
-          storeSelectedOrg(defaultOrg.id, defaultOrg.name);
-        }
-
-        storeTokens(accessToken, refreshToken);
+        storeTokens(accessToken, refreshToken, "oauth");
 
         spinner.stopAndPersist({
           text: `Login Successful!`

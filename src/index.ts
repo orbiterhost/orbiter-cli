@@ -1,5 +1,5 @@
 import { command, subcommands, run, binary, string, option, positional, optional } from 'cmd-ts';
-import { login, selectOrg } from './utils/auth';
+import { authenticateWithApiKey, login } from './utils/auth';
 import { createSite, deleteSite, listSites, listVersions, rollbackSite, updateSite } from './utils/sites';
 //@ts-ignore
 import figlet from "figlet"
@@ -31,6 +31,22 @@ const loginCmd = command({
       return;
     }
     await login(args.provider as 'github' | 'google');
+  },
+});
+
+const authCmd = command({
+  name: 'auth',
+  description: 'Authenticate using an API key',
+  args: {
+    key: option({
+      type: optional(string),
+      long: 'key',
+      short: 'k',
+      description: 'Your API key',
+    }),
+  },
+  handler: async (args) => {
+    await authenticateWithApiKey(args.key);
   },
 });
 
@@ -168,9 +184,10 @@ const deleteCmd = command({
 const cli = subcommands({
   name: 'orbiter',
   description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter login`,
-  version: '0.3.1',
+  version: '0.4.0',
   cmds: {
     login: loginCmd,
+    auth: authCmd,
     create: createCmd,
     list: listCmd,
     update: updateCmd,
