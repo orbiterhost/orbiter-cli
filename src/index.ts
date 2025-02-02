@@ -164,14 +164,6 @@ const deleteCmd = command({
   },
 });
 
-const orgCmd = command({
-  name: 'orgs',
-  description: 'List and select organization',
-  args: {},
-  handler: async () => {
-    await selectOrg()
-  }
-});
 
 const cli = subcommands({
   name: 'orbiter',
@@ -179,7 +171,6 @@ const cli = subcommands({
   version: '0.3.1',
   cmds: {
     login: loginCmd,
-    orgs: orgCmd,
     create: createCmd,
     list: listCmd,
     update: updateCmd,
