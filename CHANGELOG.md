@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2025-02-02
+
+### 🚀 Features
+
+- Added API Auth
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Removed org command
+- Version bump
+
 ## [0.3.1] - 2025-01-31
 
 ### ⚙️ Miscellaneous Tasks
