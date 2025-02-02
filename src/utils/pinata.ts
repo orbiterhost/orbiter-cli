@@ -8,7 +8,7 @@ const pinata = new PinataSDK({
   pinataGateway: ""
 })
 
-async function upload(filePath: string, key: string, userId: string) {
+async function upload(filePath: string, key: string) {
   const absolutePath = path.join(process.cwd(), filePath);
   const files: File[] = [];
 
@@ -59,19 +59,9 @@ async function upload(filePath: string, key: string, userId: string) {
     ? await pinata.upload.file(files[0])
       .key(key)
       .group("c5e8c379-e7c1-4c43-a2e9-79597d477481")
-      .addMetadata({
-        keyValues: {
-          userId: userId
-        }
-      })
     : await pinata.upload.fileArray(files)
       .key(key)
       .group("c5e8c379-e7c1-4c43-a2e9-79597d477481")
-      .addMetadata({
-        keyValues: {
-          userId: userId
-        }
-      });
 
   return result;
 }
@@ -85,28 +75,31 @@ export async function uploadSite(filePath: string) {
       return;
     }
 
-    await supabase.auth.setSession({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token
-    });
+    if (tokens.keyType === "oauth") {
+      await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token as string
+      });
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-    const { data: { session }, error } = await supabase.auth.getSession();
-
-    if (error || !session) {
-      console.log('No active session found');
-      return;
+      if (error || !session) {
+        console.log('No active session found');
+        return;
+      }
     }
 
     const keyReq = await fetch("https://api.orbiter.host/keys/upload_key", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Orbiter-Token": tokens.access_token
+        ...(tokens.keyType === 'apikey'
+          ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+          : { "X-Orbiter-Token": tokens.access_token })
       },
       body: JSON.stringify({}),
     })
     const keyRes = await keyReq.json()
-    const result = await upload(filePath, keyRes.data, session.user.id)
+    const result = await upload(filePath, keyRes.data)
     return result
   } catch (error) {
     console.log(error)
