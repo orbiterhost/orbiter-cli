@@ -50,6 +50,16 @@ Start by running `login` including your `--provider` (shorthand `-p`) of choice 
 orbiter login --provider google
 ```
 
+### `auth`
+
+An alternative way to authenticate the CLI is with an Orbiter API key. This can be obtained at [app.orbiter.host/api-keys](https://app.orbiter.host/api-keys). You can either just run `orbiter auth` and it will prompt you for the key and not display it visibly, or if you're using the CLI in an automation you can use the `--key` flag.
+
+```bash
+orbiter auth # Will prompt you for the key
+
+orbiter auth --key <YOUR_API_KEY> # Will bypass the prompt and authorize
+```
+
 ### `create`
 
 Uploads and create a new site on Orbiter. Must include the `--domain` or `-d` for the default subdomain of the site. After providing a name give the path to the file or folder of the website you are creating, must contain an `index.html` file.
