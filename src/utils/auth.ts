@@ -19,6 +19,7 @@ export const supabase = createClient(
 
 const TOKEN_FILE = path.join(os.homedir(), '.orbiter.json')
 const ORG_FILE = path.join(os.homedir(), '.orbiter-org.json');
+const ORBITER_API_KEY = 'ORBITER_API_KEY';
 
 interface OrgData {
   id: string;
@@ -169,6 +170,15 @@ export async function refreshToken(): Promise<TokenData | null> {
 }
 
 export async function getValidTokens(): Promise<TokenData | null> {
+  const envApiKey = process.env[ORBITER_API_KEY];
+  if (envApiKey) {
+    return {
+      access_token: envApiKey,
+      created_at: new Date().toISOString(),
+      keyType: 'apikey'
+    };
+  }
+
   const storedTokens = getStoredTokens();
 
   if (!storedTokens) {
