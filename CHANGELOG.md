@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2025-02-10
+
+### 🐛 Bug Fixes
+
+- Updated access token header switch
+
+## [0.4.1] - 2025-02-09
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog
+- Update README
+- Added enviornment variable support
+
 ## [0.4.0] - 2025-02-02
 
 ### 🚀 Features
