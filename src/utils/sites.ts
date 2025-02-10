@@ -171,7 +171,9 @@ export async function updateSite(path: string, siteId?: string, domain?: string)
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "X-Orbiter-Token": tokens.access_token,
+          ...(tokens.keyType === 'apikey'
+            ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+            : { "X-Orbiter-Token": tokens.access_token })
         },
       });
       const result = await siteReq.json()
@@ -342,7 +344,9 @@ export async function rollbackSite(domain: string, cid: string) {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "X-Orbiter-Token": tokens.access_token,
+        ...(tokens.keyType === 'apikey'
+          ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+          : { "X-Orbiter-Token": tokens.access_token })
       },
     });
     const result = await siteReq.json()
@@ -353,7 +357,9 @@ export async function rollbackSite(domain: string, cid: string) {
       //  @ts-ignore
       headers: {
         "Content-Type": "application/json",
-        "X-Orbiter-Token": tokens.access_token,
+        ...(tokens.keyType === 'apikey'
+          ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+          : { "X-Orbiter-Token": tokens.access_token })
       },
       body: JSON.stringify({
         cid: cid,
