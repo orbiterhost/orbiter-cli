@@ -1,14 +1,13 @@
 import { createClient, type Provider } from '@supabase/supabase-js'
 import { SUPABASE_CONFIG } from "../config"
 //@ts-ignore
-import express from 'express'
+import express, { Request, Response } from 'express'
 import open from 'open'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import ora, { type Ora } from 'ora'
 import inquirer from 'inquirer';
-import { getOrgMemebershipsForUser } from './db'
 
 let spinner: Ora
 
@@ -232,7 +231,7 @@ export async function login(provider: Provider) {
     let serverHandle: any
 
     // Serve an HTML page that will parse the hash and send it to the server
-    app.get('/', (req, res) => {
+    app.get('/', (_req: Request, res: Response) => {
       res.send(`
         <html>
           <style>
@@ -283,7 +282,7 @@ export async function login(provider: Provider) {
 
 
     // Handle the callback with the hash parameters
-    app.get('/callback', async (req, res) => {
+    app.get('/callback', async (req: Request, res: Response) => {
       try {
         const accessToken = req.query.access_token as string;
         const refreshToken = req.query.refresh_token as string;
@@ -295,7 +294,7 @@ export async function login(provider: Provider) {
         }
 
         // Set the session
-        const { data, error } = await supabase.auth.setSession({
+        const { error } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken
         });
