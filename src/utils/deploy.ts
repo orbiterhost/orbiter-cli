@@ -15,82 +15,111 @@ interface OrbiterConfig {
   buildDir: string;
 }
 
-async function createNewDeployment(): Promise<OrbiterConfig> {
-  // Get list of existing sites
-  const sites = await listSites();
-  const siteChoices = sites?.data?.map((site: any) => ({
-    name: `${site.domain} (${site.id})`,
-    value: { id: site.id, domain: site.domain }
-  })) || [];
+interface DeploymentOptions {
+  domain?: string;
+  siteId?: string;
+  buildCommand?: string;
+  buildDir?: string;
+}
 
-  const { action } = await inquirer.prompt([{
-    type: 'list',
-    name: 'action',
-    message: 'Would you like to:',
-    choices: [
-      { name: 'Create new site', value: 'new' },
-      ...(siteChoices.length ? [{ name: 'Link to existing site', value: 'existing' }] : [])
-    ]
-  }]);
+async function createNewDeployment(options?: DeploymentOptions): Promise<OrbiterConfig> {
+  let siteId = options?.siteId;
+  let domain = options?.domain;
+  let buildCommand = options?.buildCommand;
+  let buildDir = options?.buildDir;
 
-  let siteId, domain;
-  if (action === 'existing') {
-    const { site } = await inquirer.prompt([{
-      type: 'list',
-      name: 'site',
-      message: 'Select a site to link:',
-      choices: siteChoices
-    }]);
-    siteId = site.id;
-    domain = site.domain.replace('.orbiter.website', '');
-  } else {
-    const { newDomain } = await inquirer.prompt([{
-      type: 'input',
-      name: 'newDomain',
-      message: 'Enter a subdomain for your new site:',
-      validate: (input) => input.length > 0 || 'Domain is required'
-    }]);
-    domain = newDomain;
+  if (siteId && !domain) {
+    const sites = await listSites();
+    const site = sites?.data?.find((site: any) => site.id === siteId);
+    if (site) {
+      domain = site.domain.replace('.orbiter.website', '');
+    } else {
+      throw new Error(`No site found with ID: ${siteId}`);
+    }
   }
 
-  const { buildCommand } = await inquirer.prompt([{
-    type: 'input',
-    name: 'buildCommand',
-    message: 'Enter build command:',
-    default: 'npm run build'
-  }]);
+  if (!siteId && !domain) {
+    // Get list of existing sites
+    const sites = await listSites();
+    const siteChoices = sites?.data?.map((site: any) => ({
+      name: `${site.domain} (${site.id})`,
+      value: { id: site.id, domain: site.domain }
+    })) || [];
 
-  const { buildDir } = await inquirer.prompt([{
-    type: 'input',
-    name: 'buildDir',
-    message: 'Enter build directory:',
-    default: 'dist'
-  }]);
+    const { action } = await inquirer.prompt([{
+      type: 'list',
+      name: 'action',
+      message: 'Would you like to:',
+      choices: [
+        { name: 'Create new site', value: 'new' },
+        ...(siteChoices.length ? [{ name: 'Link to existing site', value: 'existing' }] : [])
+      ]
+    }]);
+
+    if (action === 'existing') {
+      const { site } = await inquirer.prompt([{
+        type: 'list',
+        name: 'site',
+        message: 'Select a site to link:',
+        choices: siteChoices
+      }]);
+      siteId = site.id;
+      domain = site.domain.replace('.orbiter.website', '');
+    } else {
+      const { newDomain } = await inquirer.prompt([{
+        type: 'input',
+        name: 'newDomain',
+        message: 'Enter a subdomain for your new site:',
+        validate: (input) => input.length > 0 || 'Domain is required'
+      }]);
+      domain = newDomain;
+    }
+  }
+
+  if (!buildCommand) {
+    const { buildCommand: cmd } = await inquirer.prompt([{
+      type: 'input',
+      name: 'buildCommand',
+      message: 'Enter build command:',
+      default: 'npm run build'
+    }]);
+    buildCommand = cmd;
+  }
+
+  if (!buildDir) {
+    const { buildDir: dir } = await inquirer.prompt([{
+      type: 'input',
+      name: 'buildDir',
+      message: 'Enter build directory:',
+      default: 'dist'
+    }]);
+    buildDir = dir;
+  }
 
   const config: OrbiterConfig = {
     siteId,
-    domain,
-    buildCommand,
-    buildDir
+    domain: domain!,
+    buildCommand: buildCommand!,
+    buildDir: buildDir!
   };
 
   fs.writeFileSync('orbiter.json', JSON.stringify(config, null, 2));
   return config;
 }
 
-export async function deploySite() {
+export async function deploySite(options?: DeploymentOptions) {
   const spinner = ora();
   try {
     const configPath = path.join(process.cwd(), 'orbiter.json');
     let config: OrbiterConfig;
 
-    if (fs.existsSync(configPath)) {
+    if (fs.existsSync(configPath) && !options) {
       spinner.start('Reading configuration...');
       config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       spinner.succeed('Configuration loaded');
     } else {
-      spinner.info('No configuration found. Starting setup...');
-      config = await createNewDeployment();
+      spinner.info('No configuration found or options provided. Starting setup...');
+      config = await createNewDeployment(options);
       spinner.succeed('Configuration created');
     }
 

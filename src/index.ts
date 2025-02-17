@@ -184,9 +184,43 @@ const deleteCmd = command({
 const deployCmd = command({
   name: 'deploy',
   description: 'Deploy your site using configuration from orbiter.json or create new deployment',
-  args: {},
-  handler: async () => {
-    await deploySite();
+  args: {
+    domain: option({
+      type: optional(string),
+      long: 'domain',
+      short: 'd',
+      description: 'Domain for the site',
+      defaultValue: undefined
+    }),
+    siteId: option({
+      type: optional(string),
+      long: 'siteId',
+      short: 's',
+      description: 'ID of existing site',
+      defaultValue: undefined
+    }),
+    buildCommand: option({
+      type: optional(string),
+      long: 'buildCommand',
+      short: 'b',
+      description: 'Build command to run',
+      defaultValue: undefined
+    }),
+    buildDir: option({
+      type: optional(string),
+      long: 'buildDir',
+      short: 'o',
+      description: 'Output directory for build',
+      defaultValue: undefined
+    })
+  },
+  handler: async (args) => {
+    await deploySite({
+      domain: args.domain,
+      siteId: args.siteId,
+      buildCommand: args.buildCommand,
+      buildDir: args.buildDir
+    });
   },
 });
 
