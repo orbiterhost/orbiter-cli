@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2025-02-17
+
+### 🚀 Features
+
+- Mvp deploy feature
+- Added optional flags for deployments
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog
+- Removed unused db file and updated types
+- Version bump
+
 ## [0.4.2] - 2025-02-10
 
 ### 🐛 Bug Fixes
