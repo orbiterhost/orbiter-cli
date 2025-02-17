@@ -3,20 +3,36 @@ import { uploadSite } from "./pinata";
 import dotenv from "dotenv";
 import { API_URL } from "../config"
 import ora from "ora";
-import { getSelectedOrg } from './auth';
 
 dotenv.config()
 
-export async function createSite(path: string, subdomain: string) {
-  const spinner = ora("Creating site...").start()
+function normalizeDomain(domain: string): { subdomain: string, fullDomain: string } {
+  const suffix = '.orbiter.website';
+  if (domain.endsWith(suffix)) {
+    const subdomain = domain.replace(suffix, '');
+    return { subdomain, fullDomain: domain };
+  }
+  return {
+    subdomain: domain,
+    fullDomain: `${domain}${suffix}`
+  };
+}
+
+
+export async function createSite(path: string, domain: string, useExistingSpinner?: boolean) {
+  const spinner = useExistingSpinner ? null : ora("Creating site...").start();
   try {
+
+    const { subdomain } = normalizeDomain(domain)
 
     const upload = await uploadSite(path)
 
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
-      spinner.stop()
+      if (spinner) {
+        spinner.stop()
+      }
       return;
     }
 
@@ -31,7 +47,9 @@ export async function createSite(path: string, subdomain: string) {
 
       if (error || !session) {
         console.log('No active session found');
-        spinner.stop()
+        if (spinner) {
+          spinner.stop()
+        }
         return;
       }
     }
@@ -51,21 +69,25 @@ export async function createSite(path: string, subdomain: string) {
     });
     if (!createReq.ok) {
       const result = await createReq.json()
-      spinner.stop()
+      if (spinner) {
+        spinner.stop()
+      }
       console.error("Problem creating site:", result)
       return
     }
-    spinner.stopAndPersist({
-      text: `Site created: https://${subdomain}.orbiter.website`
-    })
+    if (spinner) {
+      spinner.succeed(`Site created: https://${subdomain}.orbiter.website`)
+    }
     return
   } catch (error) {
-    spinner.stop()
+    if (spinner) {
+      spinner.stop()
+    }
     console.log(error)
   }
 }
 
-export async function listSites(domain?: string) {
+export async function listSites(domain?: string, verbose?: boolean) {
   const spinner = ora("Fetching sites...").start()
   try {
 
@@ -109,7 +131,9 @@ export async function listSites(domain?: string) {
         return
       }
       spinner.stop()
-      console.log(result)
+      if (verbose) {
+        console.log(result)
+      }
       return result
     }
 
@@ -129,7 +153,9 @@ export async function listSites(domain?: string) {
       return
     }
     spinner.stop()
-    console.log(result)
+    if (verbose) {
+      console.log(result)
+    }
     return result
 
   } catch (error) {
@@ -139,15 +165,18 @@ export async function listSites(domain?: string) {
 }
 
 
-export async function updateSite(path: string, siteId?: string, domain?: string) {
-  const spinner = ora("Updating site...").start()
+export async function updateSite(path: string, siteId?: string, domain?: string, useExistingSpinner?: boolean) {
+  const spinner = useExistingSpinner ? null : ora("Updating site...").start();
   try {
     let id: string | undefined = siteId
     const upload = await uploadSite(path)
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
-      spinner.stop()
+      if (spinner) {
+        spinner.stop()
+      }
+
       return;
     }
 
@@ -161,13 +190,16 @@ export async function updateSite(path: string, siteId?: string, domain?: string)
 
       if (error || !session) {
         console.log('No active session found');
-        spinner.stop()
+        if (spinner) {
+          spinner.stop()
+        }
         return;
       }
     }
 
     if (domain) {
-      const siteReq = await fetch(`${API_URL}/sites?domain=${domain}`, {
+      const { subdomain } = normalizeDomain(domain);
+      const siteReq = await fetch(`${API_URL}/sites?domain=${subdomain}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -195,18 +227,22 @@ export async function updateSite(path: string, siteId?: string, domain?: string)
     });
     if (!updateReq.ok) {
       const updateRes = await updateReq.json()
-      spinner.stop()
+      if (spinner) {
+        spinner.stop()
+      }
       console.error("Problem updating site: ", updateRes)
       return
     }
 
-    spinner.stopAndPersist({
-      text: `Site updated`
-    })
+    if (spinner) {
+      spinner.succeed(`Site updated`)
+    }
 
     return
   } catch (error) {
-    spinner.stop()
+    if (spinner) {
+      spinner.stop()
+    }
     console.log(error)
   }
 }
@@ -253,9 +289,7 @@ export async function deleteSite(siteId: string) {
       return
     }
 
-    spinner.stopAndPersist({
-      text: `Site deleted`
-    })
+    spinner.succeed(`Site deleted`)
 
     return
   } catch (error) {
@@ -266,6 +300,8 @@ export async function deleteSite(siteId: string) {
 }
 
 export async function listVersions(domain: string) {
+  const { fullDomain } = normalizeDomain(domain);
+
   const spinner = ora("Fetching versions...").start()
   try {
 
@@ -289,7 +325,7 @@ export async function listVersions(domain: string) {
       }
     }
 
-    const siteReq = await fetch(`${API_URL}/sites/${domain}.orbiter.website/versions`, {
+    const siteReq = await fetch(`${API_URL}/sites/${fullDomain}/versions`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -372,9 +408,7 @@ export async function rollbackSite(domain: string, cid: string) {
       return
     }
 
-    spinner.stopAndPersist({
-      text: `Rollback Complete`
-    })
+    spinner.succeed(`Rollback Complete`)
 
     return
   } catch (error) {

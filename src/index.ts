@@ -1,6 +1,7 @@
 import { command, subcommands, run, binary, string, option, positional, optional } from 'cmd-ts';
 import { authenticateWithApiKey, login } from './utils/auth';
 import { createSite, deleteSite, listSites, listVersions, rollbackSite, updateSite } from './utils/sites';
+import { deploySite } from "./utils/deploy"
 //@ts-ignore
 import figlet from "figlet"
 
@@ -88,7 +89,7 @@ const listCmd = command({
     }),
   },
   handler: async (args) => {
-    await listSites(args.domain);
+    await listSites(args.domain, true);
   },
 });
 
@@ -180,6 +181,15 @@ const deleteCmd = command({
   },
 });
 
+const deployCmd = command({
+  name: 'deploy',
+  description: 'Deploy your site using configuration from orbiter.json or create new deployment',
+  args: {},
+  handler: async () => {
+    await deploySite();
+  },
+});
+
 
 const cli = subcommands({
   name: 'orbiter',
@@ -194,6 +204,7 @@ const cli = subcommands({
     versions: versionsCmd,
     rollback: rollbackCmd,
     delete: deleteCmd,
+    deploy: deployCmd
   },
 });
 
