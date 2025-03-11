@@ -113,7 +113,9 @@ export async function deploySite(options?: DeploymentOptions) {
     const configPath = path.join(process.cwd(), 'orbiter.json');
     let config: OrbiterConfig;
 
-    if (fs.existsSync(configPath) && !options) {
+    if (fs.existsSync(configPath) &&
+      (!options ||
+        !(options.domain || options.siteId || options.buildCommand || options.buildDir))) {
       spinner.start('Reading configuration...');
       config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       spinner.succeed('Configuration loaded');
