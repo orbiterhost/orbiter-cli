@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2025-03-11
+
+### 🐛 Bug Fixes
+
+- Fixed issue with deploy command reading orbiter.json config
+
+### ⚙️ Miscellaneous Tasks
+
+- Update readme
+
 ## [0.5.0] - 2025-02-17
 
 ### 🚀 Features
