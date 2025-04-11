@@ -32,8 +32,8 @@ interface TemplateMetadata {
 /**
  * Fetch template from GitHub repository
  */
-async function fetchTemplate(templateName: string): Promise<string> {
-  const spinner = ora(`Fetching template: ${templateName}`).start();
+async function fetchTemplate(templateName: string, parentSpinner?: ora.Ora): Promise<string> {
+  const spinner = parentSpinner || ora(`Fetching template: ${templateName}`).start();
 
   // Create cache directory if it doesn't exist
   fs.mkdirSync(TEMPLATES_CACHE_DIR, { recursive: true });
@@ -245,7 +245,7 @@ export async function createInteractiveMiniApp(providedName?: string) {
     const targetDir = path.join(process.cwd(), projectName);
 
     // Get the template directory
-    const templateDir = await fetchTemplate(template);
+    const templateDir = await fetchTemplate(template, spinner);
 
     // Create target directory
     fs.mkdirSync(targetDir, { recursive: true });
