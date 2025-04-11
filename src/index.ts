@@ -4,6 +4,7 @@ import { createSite, deleteSite, listSites, listVersions, rollbackSite, updateSi
 import { deploySite } from "./utils/deploy"
 //@ts-ignore
 import figlet from "figlet"
+import { createInteractiveMiniApp } from './utils/template';
 
 
 const text =
@@ -225,6 +226,21 @@ const deployCmd = command({
 });
 
 
+const createMiniAppCmd = command({
+  name: 'miniapp',
+  description: 'Create a new Farcaster Mini App ready to deploy',
+  args: {
+    projectName: positional({
+      type: optional(string),
+      displayName: 'name',
+      description: 'Name of the new project',
+    }),
+  },
+  handler: async (args) => {
+    await createInteractiveMiniApp(args.projectName);
+  },
+});
+
 const cli = subcommands({
   name: 'orbiter',
   description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter login`,
@@ -238,7 +254,8 @@ const cli = subcommands({
     versions: versionsCmd,
     rollback: rollbackCmd,
     delete: deleteCmd,
-    deploy: deployCmd
+    deploy: deployCmd,
+    miniapp: createMiniAppCmd
   },
 });
 
