@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2025-04-11
+
+### 🚀 Features
+
+- Added miniapp command
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Version bump
+
 ## [0.5.1] - 2025-03-11
 
 ### 🐛 Bug Fixes
