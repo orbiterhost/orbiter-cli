@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2] - 2025-04-15
+
+### 🚀 Features
+
+- Added automatic account association for miniapp deployments
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Version bump
+
 ## [0.6.1] - 2025-04-11
 
 ### 🐛 Bug Fixes
