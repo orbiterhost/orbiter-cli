@@ -6,6 +6,10 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fetch from 'node-fetch';
 import inquirer from 'inquirer';
+import { getValidTokens } from './auth';
+import { API_URL } from '../config';
+import { listSites } from './sites';
+import { deploySite } from './deploy';
 
 const execAsync = promisify(exec);
 
@@ -180,7 +184,7 @@ export async function getTemplateMetadata(templateName: string): Promise<Templat
  * Creates a new project from a template
  */
 export async function createInteractiveMiniApp(providedName?: string) {
-  const spinner = ora().start('Setting up your Farcaster Mini App');
+  const spinner = ora('Setting up your Farcaster Mini App').start();
   let projectName = providedName as string;
 
   try {
@@ -197,7 +201,7 @@ export async function createInteractiveMiniApp(providedName?: string) {
       spinner.start('Setting up your Farcaster Mini App');
     }
 
-    // Get frame name
+    // Get frame name and domain - stop spinner during prompts
     spinner.stop();
     const { appName } = await inquirer.prompt([{
       type: 'input',
@@ -207,7 +211,6 @@ export async function createInteractiveMiniApp(providedName?: string) {
       validate: (input) => input.length > 0 || 'Mini App name is required'
     }]);
 
-    // Get domain
     const { domain } = await inquirer.prompt([{
       type: 'input',
       name: 'domain',
@@ -227,7 +230,6 @@ export async function createInteractiveMiniApp(providedName?: string) {
     const templates = await listAvailableTemplates();
     spinner.stop();
 
-    // Filter templates - prefer frame templates, but fallback to all if none found
     if (templates.length === 0) {
       throw new Error('No templates found. Please check your internet connection or try again later.');
     }
@@ -261,46 +263,68 @@ export async function createInteractiveMiniApp(providedName?: string) {
     await execAsync('npm install', { cwd: targetDir });
     spinner.succeed('Project created and dependencies installed');
 
-    // Deploy the project
-    spinner.text = 'Preparing to deploy...';
-    spinner.start();
+    // Save the current working directory
+    const originalCwd = process.cwd();
 
-    // Create orbiter.json for deployment
-    const orbiterConfig = {
-      domain,
-      buildCommand: 'npm run build',
-      buildDir: 'dist' // Adjust based on common template output dirs
-    };
-
-    fs.writeFileSync(
-      path.join(targetDir, 'orbiter.json'),
-      JSON.stringify(orbiterConfig, null, 2)
-    );
-
-    let buildError: any
-
-    // Run build and deploy
-    spinner.text = 'Building project...';
     try {
-      await execAsync('npm install && npm run build', { cwd: targetDir });
+      // Change to the target directory
+      process.chdir(targetDir);
 
+      // Run build
+      spinner.text = 'Building project...';
+      spinner.start();
+      await execAsync('npm run build');
+
+      // Deploy directly using the deploySite function
       spinner.text = 'Deploying to Orbiter...';
-      await execAsync('npx orbiter-cli deploy', { cwd: targetDir });
+      // Pass the existing spinner to deploySite
+      await deploySite({
+        domain: domain,
+        buildCommand: 'npm run build',
+        buildDir: 'dist',
+        spinner: spinner // Pass the spinner
+      });
 
+      const sites = await listSites(domain, false, spinner);
+
+      if (!sites || !sites.data || sites.data.length === 0) {
+        throw new Error(`Could not find deployed site for domain ${domain}`);
+      }
+
+      const deployedSiteId = sites.data[0].id;
+
+      // Check for farcaster.json first before showing any farcaster-related messages
+      const farcasterConfigPath = path.join(targetDir, 'public/.well-known/farcaster.json');
+      if (fs.existsSync(farcasterConfigPath)) {
+        try {
+          await setupFarcasterAccountAssociation(deployedSiteId, farcasterConfigPath);
+
+          await deploySite({
+            domain: domain,
+            siteId: deployedSiteId,
+            buildCommand: 'npm run build',
+            buildDir: 'dist',
+            spinner: spinner
+          });
+        } catch (associationError) {
+          // Just continue without showing error - we'll still have a working deployment
+          spinner.text = 'Finishing deployment...';
+        }
+      }
+
+      // Final success message
       spinner.succeed(`🚀 Mini App deployed successfully to https://${domain}.orbiter.website`);
-    } catch (buildError) {
-      spinner.warn(`Build or deploy encountered an issue, but your project has been created.`);
-      console.error('Error details:', buildError);
+    } finally {
+      // Restore the original working directory
+      process.chdir(originalCwd);
     }
-
   } catch (error) {
     spinner.fail('Failed to create Mini App');
     console.error('Error:', error);
   }
 }
-/**
- * Recursively copy template files to target directory with modifications
- */
+
+//  Recursively copy template files to target directory with modifications
 function copyTemplateFilesRecursive(source: string, target: string, options: TemplateOptions) {
   // Get all items in the source directory
   const items = fs.readdirSync(source);
@@ -383,6 +407,106 @@ function processIndexHtml(content: string, options: TemplateOptions): string {
     }
   }
 }
+
+export async function setupFarcasterAccountAssociation(
+  siteId: string,
+  configPath: string = './public/.well-known/farcaster.json',
+): Promise<boolean> {
+
+  try {
+    // Check if site ID is valid
+    if (!siteId) {
+      const error = new Error('Cannot setup account association: Site ID is missing or undefined');
+      throw error;
+    }
+
+    // Check if config file exists
+    if (!fs.existsSync(configPath)) {
+      const error = new Error(`Cannot setup account association: Config file not found at ${configPath}`);
+      throw error;
+    }
+
+    // Get tokens for authentication
+    const tokens = await getValidTokens();
+    if (!tokens) {
+      const error = new Error('Cannot setup account association: Authorization required. Please login first.');
+      throw error;
+    }
+
+    try {
+      const accountAssociationReq = await fetch(`${API_URL}/farcaster/account_association/${siteId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(tokens.keyType === 'apikey'
+            ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+            : { "X-Orbiter-Token": tokens.access_token })
+        },
+      });
+
+      // Handle API errors with detailed information
+      if (!accountAssociationReq.ok) {
+        let errorDetail = `Status: ${accountAssociationReq.status} ${accountAssociationReq.statusText}`;
+
+        try {
+          const errorData = await accountAssociationReq.json();
+          errorDetail += `, Response: ${JSON.stringify(errorData)}`;
+        } catch (e) {
+          errorDetail += `, Response: Could not parse JSON response`;
+        }
+
+        const error = new Error(`Account association API call failed. ${errorDetail}`);
+        throw error;
+      }
+
+      // Parse the response
+      let associationData;
+      try {
+        associationData = await accountAssociationReq.json();
+        if (!associationData) {
+          const error = new Error('API returned empty response for account association');
+          throw error;
+        }
+      } catch (jsonError: any) {
+        const error = new Error(`Failed to parse API response: ${jsonError.message}`);
+        throw error;
+      }
+
+      let farcasterConfig;
+      try {
+        const fileContent = fs.readFileSync(configPath, 'utf8');
+        farcasterConfig = JSON.parse(fileContent);
+      } catch (readError: any) {
+        const error = new Error(`Failed to read or parse farcaster.json: ${readError.message}`);
+        throw error;
+      }
+
+      // Handle the response data structure
+      if (associationData && typeof associationData === 'object' && 'accountAssociation' in associationData) {
+        farcasterConfig.accountAssociation = associationData.accountAssociation;
+      } else {
+        farcasterConfig.accountAssociation = associationData;
+      }
+
+      try {
+        fs.writeFileSync(configPath, JSON.stringify(farcasterConfig, null, 2));
+      } catch (writeError: any) {
+        const error = new Error(`Failed to write updated farcaster.json: ${writeError.message} `);
+        throw error;
+      }
+
+      return true;
+
+    } catch (apiError: any) {
+      throw new Error(`Failed to set up account association with API: ${apiError.message} `);
+    }
+
+  } catch (error: any) {
+
+    throw new Error(`Account association setup failed: ${error.message} `);
+  }
+}
+
 /**
  * Process farcaster.json template
  */

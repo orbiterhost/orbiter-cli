@@ -87,14 +87,15 @@ export async function createSite(path: string, domain: string, useExistingSpinne
   }
 }
 
-export async function listSites(domain?: string, verbose?: boolean) {
-  const spinner = ora("Fetching sites...").start()
+export async function listSites(domain?: string, verbose?: boolean, existingSpinner?: ora.Ora) {
+  const spinner = existingSpinner || ora("Fetching sites...").start();
+  const shouldManageSpinner = !existingSpinner;
+
   try {
 
     const tokens = await getValidTokens();
     if (!tokens) {
-      console.log('Please login first');
-      spinner.stop()
+      if (shouldManageSpinner) spinner.fail('Please login first');
       return;
     }
 
@@ -124,17 +125,16 @@ export async function listSites(domain?: string, verbose?: boolean) {
             : { "X-Orbiter-Token": tokens.access_token })
         },
       });
-      const result = await siteReq.json()
+      const result = await siteReq.json();
       if (!siteReq.ok) {
-        spinner.stop()
-        console.error("Problem fetching sites: ", result)
-        return
+        if (shouldManageSpinner) spinner.fail("Problem fetching sites: " + JSON.stringify(result));
+        return;
       }
-      spinner.stop()
+      if (shouldManageSpinner) spinner.stop();
       if (verbose) {
-        console.log(result)
+        console.log(result);
       }
-      return result
+      return result;
     }
 
     const siteReq = await fetch(`${API_URL}/sites`, {
@@ -152,12 +152,11 @@ export async function listSites(domain?: string, verbose?: boolean) {
       console.error("Problem fetching sites: ", result)
       return
     }
-    spinner.stop()
+    if (shouldManageSpinner) spinner.stop();
     if (verbose) {
-      console.log(result)
+      console.log(result);
     }
-    return result
-
+    return result;
   } catch (error) {
     spinner.stop()
     console.log(error)

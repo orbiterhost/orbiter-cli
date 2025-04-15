@@ -20,6 +20,7 @@ interface DeploymentOptions {
   siteId?: string;
   buildCommand?: string;
   buildDir?: string;
+  spinner?: ora.Ora;
 }
 
 async function createNewDeployment(options?: DeploymentOptions): Promise<OrbiterConfig> {
@@ -108,7 +109,10 @@ async function createNewDeployment(options?: DeploymentOptions): Promise<Orbiter
 }
 
 export async function deploySite(options?: DeploymentOptions) {
-  const spinner = ora();
+  // Use existing spinner or create a new one
+  const spinner = options?.spinner || ora();
+  const shouldStartSpinner = !options?.spinner; // Only start if we created it
+
   try {
     const configPath = path.join(process.cwd(), 'orbiter.json');
     let config: OrbiterConfig;
@@ -116,27 +120,37 @@ export async function deploySite(options?: DeploymentOptions) {
     if (fs.existsSync(configPath) &&
       (!options ||
         !(options.domain || options.siteId || options.buildCommand || options.buildDir))) {
-      spinner.start('Reading configuration...');
+      if (shouldStartSpinner) spinner.start('Reading configuration...');
+      else spinner.text = 'Reading configuration...';
+
       config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      spinner.succeed('Configuration loaded');
+      if (shouldStartSpinner) spinner.succeed('Configuration loaded');
     } else {
-      spinner.info('No configuration found or options provided. Starting setup...');
+      if (shouldStartSpinner) spinner.info('No configuration found or options provided. Starting setup...');
+      else spinner.text = 'No configuration found. Setting up...';
+
       config = await createNewDeployment(options);
-      spinner.succeed('Configuration created');
+      if (shouldStartSpinner) spinner.succeed('Configuration created');
     }
 
     // Run build command
-    spinner.start(`Running build command: ${config.buildCommand}`);
+    if (shouldStartSpinner) spinner.start(`Running build command: ${config.buildCommand}`);
+    else spinner.text = `Running build command: ${config.buildCommand}`;
+
     await execAsync(config.buildCommand);
-    spinner.succeed('Build completed');
+    if (shouldStartSpinner) spinner.succeed('Build completed');
 
     // Deploy
     if (config.siteId) {
-      spinner.start(`Updating existing site: ${config.domain}.orbiter.website`);
+      if (shouldStartSpinner) spinner.start(`Updating existing site: ${config.domain}.orbiter.website`);
+      else spinner.text = `Updating existing site: ${config.domain}.orbiter.website`;
+
       await updateSite(config.buildDir, config.siteId, undefined, true);
-      spinner.succeed(`Site updated: https://${config.domain}.orbiter.website`);
+      if (shouldStartSpinner) spinner.succeed(`Site updated: https://${config.domain}.orbiter.website`);
     } else {
-      spinner.start(`Creating new site: https://${config.domain}.orbiter.website`);
+      if (shouldStartSpinner) spinner.start(`Creating new site: https://${config.domain}.orbiter.website`);
+      else spinner.text = `Creating new site: https://${config.domain}.orbiter.website`;
+
       await createSite(config.buildDir, config.domain, true);
 
       // Update config with new site ID
@@ -145,10 +159,11 @@ export async function deploySite(options?: DeploymentOptions) {
         config.siteId = sites.data[0].id;
         fs.writeFileSync('orbiter.json', JSON.stringify(config, null, 2));
       }
-      spinner.succeed(`Site deployed: https://${config.domain}.orbiter.website`);
+      if (shouldStartSpinner) spinner.succeed(`Site deployed: https://${config.domain}.orbiter.website`);
     }
   } catch (error) {
-    spinner.fail('Deployment failed');
+    if (shouldStartSpinner) spinner.fail('Deployment failed');
+    else spinner.text = 'Deployment failed';
     console.error('Error:', error);
   }
 }
