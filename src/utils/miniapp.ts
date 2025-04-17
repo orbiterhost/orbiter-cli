@@ -18,10 +18,11 @@ const TEMPLATES_REPO = 'orbiterhost/orbiter-templates';
 const TEMPLATES_REPO_URL = 'https://github.com/orbiterhost/orbiter-templates';
 const TEMPLATES_RAW_URL = 'https://raw.githubusercontent.com/orbiterhost/orbiter-templates/main';
 const TEMPLATES_CACHE_DIR = path.join(os.homedir(), '.orbiter', 'templates');
-const TEMPLATES_SUBDIRECTORY = 'general';
+const TEMPLATES_SUBDIRECTORY = 'mini-apps';
 
 
 interface TemplateOptions {
+  appName?: string;
   domain?: string;
 }
 
@@ -182,8 +183,8 @@ export async function getTemplateMetadata(templateName: string): Promise<Templat
 /**
  * Creates a new project from a template
  */
-export async function createTemplateApp(providedName?: string) {
-  const spinner = ora('Setting Up your app').start();
+export async function createInteractiveMiniApp(providedName?: string) {
+  const spinner = ora('Setting up your Farcaster Mini App').start();
   let projectName = providedName as string;
 
   try {
@@ -197,10 +198,19 @@ export async function createTemplateApp(providedName?: string) {
         validate: (input) => input.length > 0 || 'Project name is required'
       }]);
       projectName = answer.projectName;
-      spinner.start('Setting up your app');
+      spinner.start('Setting up your Farcaster Mini App');
     }
 
+    // Get frame name and domain - stop spinner during prompts
     spinner.stop();
+    const { appName } = await inquirer.prompt([{
+      type: 'input',
+      name: 'appName',
+      message: 'What should your Mini App be called?',
+      default: projectName,
+      validate: (input) => input.length > 0 || 'Mini App name is required'
+    }]);
+
     const { domain } = await inquirer.prompt([{
       type: 'input',
       name: 'domain',
@@ -244,6 +254,7 @@ export async function createTemplateApp(providedName?: string) {
 
     // Copy template files with modifications
     copyTemplateFilesRecursive(templateDir, targetDir, {
+      appName,
       domain
     });
 
@@ -270,7 +281,60 @@ export async function createTemplateApp(providedName?: string) {
         spinner: spinner // Pass the spinner
       });
 
-      spinner.succeed(`🚀 App deployed successfully to https://${domain}.orbiter.website`);
+      let deployedSiteId;
+      try {
+        const tokens = await getValidTokens();
+        if (!tokens) {
+          throw new Error('Authorization required. Please login first.');
+        }
+
+        const siteReq = await fetch(`${API_URL}/sites?domain=${domain}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(tokens.keyType === 'apikey'
+              ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+              : { "X-Orbiter-Token": tokens.access_token })
+          },
+        });
+
+        const siteData: any = await siteReq.json();
+
+        if (!siteReq.ok) {
+          throw new Error(`Problem retrieving site data: ${JSON.stringify(siteData)}`);
+        }
+
+        if (!siteData || !siteData.data || siteData.data.length === 0) {
+          throw new Error(`Could not find deployed site for domain ${domain}`);
+        }
+
+        deployedSiteId = siteData.data[0].id;
+      } catch (error) {
+        spinner.fail('Could not retrieve site information');
+        throw error;
+      }
+
+      // Check for farcaster.json first before showing any farcaster-related messages
+      const farcasterConfigPath = path.join(targetDir, 'public/.well-known/farcaster.json');
+      if (fs.existsSync(farcasterConfigPath)) {
+        try {
+          await setupFarcasterAccountAssociation(deployedSiteId, farcasterConfigPath);
+
+          await deploySite({
+            domain: domain,
+            siteId: deployedSiteId,
+            buildCommand: 'npm run build',
+            buildDir: 'dist',
+            spinner: spinner
+          });
+        } catch (associationError) {
+          // Just continue without showing error - we'll still have a working deployment
+          spinner.text = 'Finishing deployment...';
+        }
+      }
+
+      // Final success message
+      spinner.succeed(`🚀 Mini App deployed successfully to https://${domain}.orbiter.website`);
     } finally {
       // Restore the original working directory
       process.chdir(originalCwd);
@@ -314,7 +378,16 @@ function copyTemplateFilesRecursive(source: string, target: string, options: Tem
 function processAndCopyFile(sourcePath: string, targetPath: string, options: TemplateOptions) {
   const content = fs.readFileSync(sourcePath, 'utf8');
 
-  if (sourcePath.endsWith('package.json')) {
+  // Special handling for specific files
+  if (sourcePath.endsWith('index.html')) {
+    const processedContent = processIndexHtml(content, options);
+    fs.writeFileSync(targetPath, processedContent);
+  }
+  else if (sourcePath.endsWith('farcaster.json')) {
+    const processedContent = processFarcasterJson(content, options);
+    fs.writeFileSync(targetPath, processedContent);
+  }
+  else if (sourcePath.endsWith('package.json')) {
     const processedContent = processPackageJson(content, options);
     fs.writeFileSync(targetPath, processedContent);
   }
@@ -324,6 +397,37 @@ function processAndCopyFile(sourcePath: string, targetPath: string, options: Tem
   }
 }
 
+/**
+ * Process index.html template
+ */
+function processIndexHtml(content: string, options: TemplateOptions): string {
+  const domain = options.domain ? `${options.domain}.orbiter.website` : 'your-app.orbiter.website';
+  const frameName = options.appName || 'Orbiter App';
+
+  // Create proper frame meta content without extra spaces
+  const frameContent = `<meta name="fc:frame" content='{"version":"next","imageUrl":"https://${domain}/image.png","button":{"title":"Launch","action":{"type":"launch_frame","name":"${frameName}","url":"https://${domain}","splashImageUrl":"https://${domain}/splash.png","splashBackgroundColor":"#ffffff"}}}' />`;
+
+  // Replace existing meta tag or add it if not present
+  if (content.includes('<meta name="fc:frame"')) {
+    return content.replace(
+      /<meta name="fc:frame"[^>]*>/,
+      frameContent
+    );
+  } else {
+    // If no fc:frame meta tag exists, add it before the title or before the closing head tag
+    if (content.includes('<title>')) {
+      return content.replace(
+        /(<title>)/,
+        `${frameContent}\n      $1`
+      );
+    } else {
+      return content.replace(
+        /<\/head>/,
+        `  ${frameContent}\n    </head>`
+      );
+    }
+  }
+}
 
 export async function setupFarcasterAccountAssociation(
   siteId: string,
@@ -425,6 +529,32 @@ export async function setupFarcasterAccountAssociation(
 }
 
 /**
+ * Process farcaster.json template
+ */
+function processFarcasterJson(content: string, options: TemplateOptions): string {
+  const domain = options.domain ? `${options.domain}.orbiter.website` : 'your-app.orbiter.website';
+  const frameName = options.appName || 'Orbiter App';
+
+  try {
+    const farcasterConfig = JSON.parse(content);
+
+    // Update frame configuration
+    if (farcasterConfig.frame) {
+      farcasterConfig.frame.name = frameName;
+      farcasterConfig.frame.homeUrl = `https://${domain}`;
+      farcasterConfig.frame.iconUrl = `https://${domain}/icon.png`;
+      farcasterConfig.frame.imageUrl = `https://${domain}/image.png`;
+      farcasterConfig.frame.splashImageUrl = `https://${domain}/splash.png`;
+    }
+
+    return JSON.stringify(farcasterConfig, null, 2);
+  } catch (error) {
+    console.warn('Error processing farcaster.json, using original');
+    return content;
+  }
+}
+
+/**
  * Process package.json template
  */
 function processPackageJson(content: string, options: TemplateOptions): string {
@@ -432,8 +562,8 @@ function processPackageJson(content: string, options: TemplateOptions): string {
     const packageJson = JSON.parse(content);
 
     // Use project name for package name
-    if (options.domain) {
-      packageJson.name = options.domain.toLowerCase().replace(/\s+/g, '-');
+    if (options.appName) {
+      packageJson.name = options.appName.toLowerCase().replace(/\s+/g, '-');
     }
 
     return JSON.stringify(packageJson, null, 2);

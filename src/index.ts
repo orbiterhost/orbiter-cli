@@ -4,7 +4,8 @@ import { createSite, deleteSite, listSites, listVersions, rollbackSite, updateSi
 import { deploySite } from "./utils/deploy"
 //@ts-ignore
 import figlet from "figlet"
-import { createInteractiveMiniApp } from './utils/template';
+import { createInteractiveMiniApp } from './utils/miniapp';
+import { createTemplateApp } from './utils/template';
 
 
 const text =
@@ -241,6 +242,21 @@ const createMiniAppCmd = command({
   },
 });
 
+const createTemplateAppCmd = command({
+  name: 'new',
+  description: 'Create a new app ready to deploy',
+  args: {
+    projectName: positional({
+      type: optional(string),
+      displayName: 'name',
+      description: 'Name of the new project',
+    }),
+  },
+  handler: async (args) => {
+    await createTemplateApp(args.projectName);
+  },
+});
+
 const cli = subcommands({
   name: 'orbiter',
   description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter login`,
@@ -255,7 +271,8 @@ const cli = subcommands({
     rollback: rollbackCmd,
     delete: deleteCmd,
     deploy: deployCmd,
-    miniapp: createMiniAppCmd
+    miniapp: createMiniAppCmd,
+    new: createTemplateAppCmd
   },
 });
 
