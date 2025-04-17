@@ -270,13 +270,9 @@ export async function createInteractiveMiniApp(providedName?: string) {
       // Change to the target directory
       process.chdir(targetDir);
 
-      // Run build
-      spinner.text = 'Building project...';
-      spinner.start();
-      await execAsync('npm run build');
-
       // Deploy directly using the deploySite function
       spinner.text = 'Deploying to Orbiter...';
+      spinner.start();
       // Pass the existing spinner to deploySite
       await deploySite({
         domain: domain,
@@ -285,13 +281,38 @@ export async function createInteractiveMiniApp(providedName?: string) {
         spinner: spinner // Pass the spinner
       });
 
-      const sites = await listSites(domain, false, spinner);
+      let deployedSiteId;
+      try {
+        const tokens = await getValidTokens();
+        if (!tokens) {
+          throw new Error('Authorization required. Please login first.');
+        }
 
-      if (!sites || !sites.data || sites.data.length === 0) {
-        throw new Error(`Could not find deployed site for domain ${domain}`);
+        const siteReq = await fetch(`${API_URL}/sites?domain=${domain}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(tokens.keyType === 'apikey'
+              ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+              : { "X-Orbiter-Token": tokens.access_token })
+          },
+        });
+
+        const siteData: any = await siteReq.json();
+
+        if (!siteReq.ok) {
+          throw new Error(`Problem retrieving site data: ${JSON.stringify(siteData)}`);
+        }
+
+        if (!siteData || !siteData.data || siteData.data.length === 0) {
+          throw new Error(`Could not find deployed site for domain ${domain}`);
+        }
+
+        deployedSiteId = siteData.data[0].id;
+      } catch (error) {
+        spinner.fail('Could not retrieve site information');
+        throw error;
       }
-
-      const deployedSiteId = sites.data[0].id;
 
       // Check for farcaster.json first before showing any farcaster-related messages
       const farcasterConfigPath = path.join(targetDir, 'public/.well-known/farcaster.json');

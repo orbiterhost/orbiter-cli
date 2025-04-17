@@ -154,7 +154,7 @@ export async function deploySite(options?: DeploymentOptions) {
       await createSite(config.buildDir, config.domain, true);
 
       // Update config with new site ID
-      const sites = await listSites(config.domain, false);
+      const sites = await listSites(config.domain, false, spinner);
       if (sites?.data?.[0]?.id) {
         config.siteId = sites.data[0].id;
         fs.writeFileSync('orbiter.json', JSON.stringify(config, null, 2));
