@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2025-04-17
+
+### 🚀 Features
+
+- Added 'new' command for creating general purpose apps
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Refactored spinners
+- Version bump
+
 ## [0.6.2] - 2025-04-15
 
 ### 🚀 Features
