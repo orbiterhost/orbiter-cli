@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2025-04-19
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Added source header for all API calls
+- Added index.html check for site uploads
+- Version bump
+
 ## [0.7.0] - 2025-04-17
 
 ### 🚀 Features
