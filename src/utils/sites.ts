@@ -57,6 +57,7 @@ export async function createSite(path: string, domain: string, useExistingSpinne
     const createReq = await fetch(`${API_URL}/sites`, {
       method: "POST",
       headers: {
+        "Source": "cli",
         "Content-Type": "application/json",
         ...(tokens.keyType === 'apikey'
           ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
@@ -119,6 +120,7 @@ export async function listSites(domain?: string, verbose?: boolean, existingSpin
       const siteReq = await fetch(`${API_URL}/sites?domain=${domain}`, {
         method: "GET",
         headers: {
+          "Source": "cli",
           "Content-Type": "application/json",
           ...(tokens.keyType === 'apikey'
             ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
@@ -140,6 +142,7 @@ export async function listSites(domain?: string, verbose?: boolean, existingSpin
     const siteReq = await fetch(`${API_URL}/sites`, {
       method: "GET",
       headers: {
+        "Source": "cli",
         "Content-Type": "application/json",
         ...(tokens.keyType === 'apikey'
           ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
@@ -201,6 +204,7 @@ export async function updateSite(path: string, siteId?: string, domain?: string,
       const siteReq = await fetch(`${API_URL}/sites?domain=${subdomain}`, {
         method: "GET",
         headers: {
+          "Source": "cli",
           "Content-Type": "application/json",
           ...(tokens.keyType === 'apikey'
             ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
@@ -215,6 +219,7 @@ export async function updateSite(path: string, siteId?: string, domain?: string,
       method: "PUT",
       //  @ts-ignore
       headers: {
+        "Source": "cli",
         "Content-Type": "application/json",
         ...(tokens.keyType === 'apikey'
           ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
@@ -275,6 +280,7 @@ export async function deleteSite(siteId: string) {
       method: "DELETE",
       //	@ts-ignore
       headers: {
+        "Source": "cli",
         "Content-Type": "application/json",
         ...(tokens.keyType === 'apikey'
           ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
@@ -327,6 +333,7 @@ export async function listVersions(domain: string) {
     const siteReq = await fetch(`${API_URL}/sites/${fullDomain}/versions`, {
       method: "GET",
       headers: {
+        "Source": "cli",
         "Content-Type": "application/json",
         ...(tokens.keyType === 'apikey'
           ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
@@ -378,6 +385,7 @@ export async function rollbackSite(domain: string, cid: string) {
     const siteReq = await fetch(`${API_URL}/sites?domain=${domain}`, {
       method: "GET",
       headers: {
+        "Source": "cli",
         "Content-Type": "application/json",
         ...(tokens.keyType === 'apikey'
           ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
@@ -391,6 +399,7 @@ export async function rollbackSite(domain: string, cid: string) {
       method: "PUT",
       //  @ts-ignore
       headers: {
+        "Source": "cli",
         "Content-Type": "application/json",
         ...(tokens.keyType === 'apikey'
           ? { "X-Orbiter-API-Key": `${tokens.access_token}` }

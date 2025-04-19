@@ -354,6 +354,7 @@ export async function setupFarcasterAccountAssociation(
       const accountAssociationReq = await fetch(`${API_URL}/farcaster/account_association/${siteId}`, {
         method: "POST",
         headers: {
+          "Source": "cli",
           "Content-Type": "application/json",
           ...(tokens.keyType === 'apikey'
             ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
