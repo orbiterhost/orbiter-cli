@@ -72,7 +72,25 @@ export async function uploadSite(filePath: string) {
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
-      return;
+      return { error: 'Not authenticated' };
+    }
+    // Check for index.html in the path
+    const absolutePath = path.join(process.cwd(), filePath);
+    const stats = fs.statSync(absolutePath);
+
+    let hasIndexHtml = false;
+
+    if (stats.isFile()) {
+      // If it's a file, check if it's named index.html
+      hasIndexHtml = path.basename(absolutePath).toLowerCase() === 'index.html';
+    } else if (stats.isDirectory()) {
+      // If it's a directory, check if it contains index.html
+      const indexPath = path.join(absolutePath, 'index.html');
+      hasIndexHtml = fs.existsSync(indexPath);
+    }
+
+    if (!hasIndexHtml) {
+      return { error: 'The upload must contain an index.html file' };
     }
 
     if (tokens.keyType === "oauth") {
@@ -83,8 +101,7 @@ export async function uploadSite(filePath: string) {
       const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error || !session) {
-        console.log('No active session found');
-        return;
+        return { error: 'No active session found' };
       }
     }
 
@@ -100,8 +117,8 @@ export async function uploadSite(filePath: string) {
     })
     const keyRes = await keyReq.json()
     const result = await upload(filePath, keyRes.data)
-    return result
+    return { data: result };
   } catch (error) {
-    console.log(error)
+    return { error };
   }
 }

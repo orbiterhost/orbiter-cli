@@ -25,7 +25,18 @@ export async function createSite(path: string, domain: string, useExistingSpinne
 
     const { subdomain } = normalizeDomain(domain)
 
-    const upload = await uploadSite(path)
+    const uploadResponse = await uploadSite(path)
+
+    if (uploadResponse.error) {
+      if (spinner) {
+        spinner.fail(`Error: ${uploadResponse.error}`);
+      } else {
+        console.error(`Error: ${uploadResponse.error}`);
+      }
+      return;
+    }
+
+    const upload = uploadResponse.data;
 
     const tokens = await getValidTokens();
     if (!tokens) {
@@ -171,7 +182,19 @@ export async function updateSite(path: string, siteId?: string, domain?: string,
   const spinner = useExistingSpinner ? null : ora("Updating site...").start();
   try {
     let id: string | undefined = siteId
-    const upload = await uploadSite(path)
+    const uploadResponse = await uploadSite(path)
+
+    if (uploadResponse.error) {
+      if (spinner) {
+        spinner.fail(`Error: ${uploadResponse.error}`);
+      } else {
+        console.error(`Error: ${uploadResponse.error}`);
+      }
+      return;
+    }
+
+    const upload = uploadResponse.data;
+
     const tokens = await getValidTokens();
     if (!tokens) {
       console.log('Please login first');
