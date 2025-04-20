@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - 2025-04-20
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog
+- Updated approach for source header
+- Version bump
+
 ## [0.7.1] - 2025-04-19
 
 ### ⚙️ Miscellaneous Tasks
