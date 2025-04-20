@@ -8,9 +8,9 @@ import fetch from 'node-fetch';
 import inquirer from 'inquirer';
 import { getValidTokens } from './auth';
 import { API_URL } from '../config';
-import { listSites } from './sites';
 import { deploySite } from './deploy';
 
+const SOURCE = process.env.SOURCE || "cli"
 const execAsync = promisify(exec);
 
 // Configuration
@@ -354,7 +354,7 @@ export async function setupFarcasterAccountAssociation(
       const accountAssociationReq = await fetch(`${API_URL}/farcaster/account_association/${siteId}`, {
         method: "POST",
         headers: {
-          "Source": "cli",
+          "Source": `${SOURCE}`,
           "Content-Type": "application/json",
           ...(tokens.keyType === 'apikey'
             ? { "X-Orbiter-API-Key": `${tokens.access_token}` }
