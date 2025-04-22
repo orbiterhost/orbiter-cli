@@ -34,7 +34,7 @@ async function upload(filePath: string, key: string) {
             readDirRecursively(fullPath);
           } else {
             const fileContent = fs.readFileSync(fullPath);
-            const relativePath = path.relative(absolutePath, fullPath);
+            const relativePath = path.posix.normalize(path.relative(absolutePath, fullPath).replace(/\\/g, '/'));
             const file = new File([fileContent], relativePath);
             files.push(file);
           }
