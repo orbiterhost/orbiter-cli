@@ -4,12 +4,12 @@
 
 A CLI for creating and managing static sites on [Orbiter](https://orbiter.host)
 
-> [!WARNING]
-> README is still a work in progress
-
 Before installing make sure you already have an account; sign up at [app.orbiter.host](https://orbiter.host).
 
 ## Installation
+
+> [!NOTE]
+> If you are using Windows please be sure to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) as the CLI does not have native support for Windows.
 
 The orbiter-cli is an NPM package you can download with manager of choice.
 
