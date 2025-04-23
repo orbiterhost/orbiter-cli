@@ -10,8 +10,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "dev": "npm run build && npm link",
-    "start": "node ./dist/index.js"
+    "dev": "bun run build && bun link",
+    "start": "bun ./dist/index.js"
   },
   "files": [
     "dist"
