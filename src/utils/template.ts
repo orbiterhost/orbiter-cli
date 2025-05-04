@@ -231,6 +231,19 @@ export async function createTemplateApp(providedName?: string) {
       choices: templates.map(t => ({ name: t, value: t }))
     }]);
 
+    const { packageManager } = await inquirer.prompt([{
+      type: 'list',
+      name: 'packageManager',
+      message: 'Select a package manager:',
+      choices: [
+        { name: 'npm', value: 'npm' },
+        { name: 'yarn', value: 'yarn' },
+        { name: 'pnpm', value: 'pnpm' },
+        { name: 'bun', value: 'bun' }
+      ],
+      default: 'npm'
+    }]);
+
     // Create the project
     spinner.text = `Creating project with ${template} template...`;
     spinner.start();
@@ -249,7 +262,32 @@ export async function createTemplateApp(providedName?: string) {
 
     // Install dependencies
     spinner.text = 'Installing dependencies...';
-    await execAsync('npm install', { cwd: targetDir });
+
+    let installCommand;
+    let buildCommand;
+
+    switch (packageManager) {
+      case 'yarn':
+        installCommand = 'yarn';
+        buildCommand = 'yarn build';
+        break;
+      case 'pnpm':
+        installCommand = 'pnpm install';
+        buildCommand = 'pnpm run build';
+        break;
+      case 'bun':
+        installCommand = 'bun install';
+        buildCommand = 'bun run build';
+        break;
+      case 'npm':
+      default:
+        installCommand = 'npm install';
+        buildCommand = 'npm run build';
+        break;
+    }
+
+    await execAsync(installCommand, { cwd: targetDir });
+
     spinner.succeed('Project created and dependencies installed');
 
     // Save the current working directory
@@ -265,7 +303,7 @@ export async function createTemplateApp(providedName?: string) {
       // Pass the existing spinner to deploySite
       await deploySite({
         domain: domain,
-        buildCommand: 'npm run build',
+        buildCommand: buildCommand,
         buildDir: 'dist',
         spinner: spinner // Pass the spinner
       });
