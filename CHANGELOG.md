@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2025-05-04
+
+### 🚀 Features
+
+- Added package manager selection for template apps and miniapps
+- Added bhvr template option
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Updated to bun
+- Refactored template.ts
+- Version bump
+
 ## [0.7.3] - 2025-04-23
 
 ### ⚙️ Miscellaneous Tasks
