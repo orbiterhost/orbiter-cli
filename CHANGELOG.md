@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2025-05-04
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Version bump
+
 ## [0.8.0] - 2025-05-04
 
 ### 🚀 Features
