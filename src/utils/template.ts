@@ -263,6 +263,8 @@ export async function createTemplateApp(providedName?: string) {
 
     let installCommand;
     let buildCommand;
+    let workingDir = targetDir; // Default working directory
+    let buildOutputDir = 'dist'; // Default build output directory
 
     switch (packageManager) {
       case 'yarn':
@@ -284,7 +286,20 @@ export async function createTemplateApp(providedName?: string) {
         break;
     }
 
-    await execAsync(installCommand, { cwd: targetDir });
+    // Special handling for bhvr monorepo template
+    if (template === 'bhvr') {
+      // Install dependencies at the root level first
+      spinner.text = 'Installing root dependencies...';
+      await execAsync(installCommand, { cwd: targetDir });
+
+      // Set client directory as the working directory for build and deploy
+      workingDir = path.join(targetDir, 'client');
+
+    } else {
+      // Standard template handling
+      spinner.text = 'Installing dependencies...';
+      await execAsync(installCommand, { cwd: targetDir });
+    }
 
     spinner.succeed('Project created and dependencies installed');
 
@@ -293,7 +308,7 @@ export async function createTemplateApp(providedName?: string) {
 
     try {
       // Change to the target directory
-      process.chdir(targetDir);
+      process.chdir(workingDir);
 
       // Deploy directly using the deploySite function
       spinner.text = 'Deploying to Orbiter...';
@@ -302,7 +317,7 @@ export async function createTemplateApp(providedName?: string) {
       await deploySite({
         domain: domain,
         buildCommand: buildCommand,
-        buildDir: 'dist',
+        buildDir: buildOutputDir,
         spinner: spinner // Pass the spinner
       });
 
@@ -347,39 +362,57 @@ function copyTemplateFilesRecursive(source: string, target: string, options: Tem
 /**
  * Process file content and write to target
  */
-function processAndCopyFile(sourcePath: string, targetPath: string, options: TemplateOptions) {
-  const content = fs.readFileSync(sourcePath, 'utf8');
+ function processAndCopyFile(sourcePath: string, targetPath: string, options: TemplateOptions) {
+   const content = fs.readFileSync(sourcePath, 'utf8');
 
-  if (sourcePath.endsWith('package.json')) {
-    const processedContent = processPackageJson(content, options);
-    fs.writeFileSync(targetPath, processedContent);
-  }
-  else {
-    // Copy file as is for all other files
-    fs.copyFileSync(sourcePath, targetPath);
-  }
-}
+   if (sourcePath.endsWith('package.json')) {
+     const processedContent = processPackageJson(content, options, targetPath);
+     fs.writeFileSync(targetPath, processedContent);
+   }
+   else {
+     // Copy file as is for all other files
+     fs.copyFileSync(sourcePath, targetPath);
+   }
+ }
 
 /**
  * Process package.json template
  */
-function processPackageJson(content: string, options: TemplateOptions): string {
-  try {
-    const packageJson = JSON.parse(content);
+ function processPackageJson(content: string, options: TemplateOptions, filePath: string): string {
+   try {
+     const packageJson = JSON.parse(content);
 
-    // Use project name for package name
-    if (options.domain) {
-      packageJson.name = options.domain.toLowerCase().replace(/\s+/g, '-');
-    }
+     // Check if this is part of the bhvr template
+     const isBhvrTemplate = filePath.includes('/bhvr') || filePath.includes('\\bhvr');
 
-    return JSON.stringify(packageJson, null, 2);
-  } catch (error) {
-    console.warn('Error processing package.json, using original');
-    return content;
-  }
-}
+     // For bhvr template, only modify the root package.json
+     if (isBhvrTemplate) {
+       // Check if this is the root package.json (not in client, server, or shared directories)
+       const isSubpackage =
+         filePath.includes('/client/') ||
+         filePath.includes('\\client\\') ||
+         filePath.includes('/server/') ||
+         filePath.includes('\\server\\') ||
+         filePath.includes('/shared/') ||
+         filePath.includes('\\shared\\');
 
-/**
+       // Only modify root package.json for bhvr template
+       if (!isSubpackage) {
+         packageJson.name = options.domain?.toLowerCase().replace(/\s+/g, '-') || 'my-app';
+       }
+     } else {
+       // For non-bhvr templates, modify the package name as usual
+       packageJson.name = options.domain?.toLowerCase().replace(/\s+/g, '-') || 'my-app';
+     }
+
+     return JSON.stringify(packageJson, null, 2);
+   } catch (error) {
+     console.warn('Error processing package.json, using original', error);
+     return content;
+   }
+ }
+
+ /**
  * Update all cached templates
  */
 export async function updateCachedTemplates(): Promise<void> {
