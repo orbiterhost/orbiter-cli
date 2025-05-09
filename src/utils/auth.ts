@@ -31,6 +31,7 @@ interface TokenData {
 	refresh_token?: string;
 	created_at: string;
 	keyType: "oauth" | "apikey";
+	organization?: OrgData;
 }
 
 export async function authenticateWithApiKey(providedKey?: string) {
@@ -63,32 +64,39 @@ export async function authenticateWithApiKey(providedKey?: string) {
 			return;
 		}
 
+		// Fetch organization info associated with this key
+		const orgReq = await fetch(`https://api.orbiter.host/organization`, {
+			headers: {
+				"X-Orbiter-API-Key": `${apiKey}`,
+			},
+		});
+
+		let orgData;
+		if (orgReq.ok) {
+			const orgResponse = await orgReq.json();
+			if (orgResponse && orgResponse.data) {
+				orgData = {
+					id: orgResponse.data.id,
+					name: orgResponse.data.name,
+					selected_at: new Date().toISOString(),
+				};
+			}
+		}
+
 		// Store the API key
 		const tokens: TokenData = {
 			access_token: apiKey,
 			created_at: new Date().toISOString(),
 			keyType: "apikey",
+			organization: orgData,
 		};
 
 		fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
 		console.log("API key stored successfully");
-
-		// // Get and store org information if available
-		// const orgResponse = await fetch(`${API_URL}/org`, {
-		//   headers: {
-		//     'Authorization': `Bearer ${apiKey}`
-		//   }
-		// });
-
-		// if (orgResponse.ok) {
-		//   const orgData = await orgResponse.json();
-		//   storeSelectedOrg(orgData.id, orgData.name);
-		// }
 	} catch (error) {
 		console.error("Error storing API key:", error);
 	}
 }
-
 export function storeSelectedOrg(orgId: string, orgName: string) {
 	const orgData: OrgData = {
 		id: orgId,
