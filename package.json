@@ -1,42 +1,40 @@
 {
-  "name": "orbiter-cli",
-  "version": "0.8.1",
-  "author": "Steve Simkins",
-  "license": "MIT",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "orbiter": "./dist/index.js"
-  },
-  "scripts": {
-    "build": "tsup",
-    "dev": "bun run build && bun link",
-    "start": "bun ./dist/index.js"
-  },
-  "files": [
-    "dist"
-  ],
-  "devDependencies": {
-    "@types/inquirer": "^9.0.7",
-    "@types/node": "^20.11.17",
-    "ts-node": "^10.9.2",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.3"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.47.10",
-    "cmd-ts": "^0.13.0",
-    "commander": "^13.0.0",
-    "conf": "^13.1.0",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "figlet": "^1.8.0",
-    "inquirer": "^12.3.3",
-    "open": "^10.1.0",
-    "ora": "^5.4.1",
-    "pinata-web3": "^0.5.4"
-  },
-  "engines": {
-    "node": ">=20"
-  }
+	"name": "orbiter-cli",
+	"version": "0.8.2",
+	"author": "Steve Simkins",
+	"license": "MIT",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"bin": {
+		"orbiter": "./dist/index.js"
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "bun run build && bun link",
+		"start": "bun ./dist/index.js"
+	},
+	"files": ["dist"],
+	"devDependencies": {
+		"@types/inquirer": "^9.0.7",
+		"@types/node": "^20.11.17",
+		"ts-node": "^10.9.2",
+		"tsup": "^8.0.1",
+		"typescript": "^5.3.3"
+	},
+	"dependencies": {
+		"@supabase/supabase-js": "^2.47.10",
+		"cmd-ts": "^0.13.0",
+		"commander": "^13.0.0",
+		"conf": "^13.1.0",
+		"dotenv": "^16.4.7",
+		"express": "^4.21.2",
+		"figlet": "^1.8.0",
+		"inquirer": "^12.3.3",
+		"open": "^10.1.0",
+		"ora": "^5.4.1",
+		"pinata-web3": "^0.5.4"
+	},
+	"engines": {
+		"node": ">=20"
+	}
 }
