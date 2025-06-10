@@ -1,7 +1,0 @@
-{
-  "siteId": "3118e79c-3c57-44c8-94fc-e499ccfc2117",
-  "entryPath": "src/index.ts",
-  "buildCommand": "esbuild src/index.ts --bundle --outfile=dist/index.js --platform=browser --target=es2020 --format=esm --minify",
-  "buildDir": "dist",
-  "runtime": "cloudflare-workers"
-}
