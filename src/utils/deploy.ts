@@ -7,6 +7,7 @@ import { listSites, createSite, updateSite } from "./sites";
 import { promisify } from "util";
 import { getValidTokens } from "./auth";
 import { API_URL } from "../config";
+import esbuild from "esbuild";
 
 const SOURCE = process.env.SOURCE || "cli";
 
@@ -49,35 +50,110 @@ interface DeploymentResponse {
 }
 
 // Server deployment functions
-async function getBunCommand(): Promise<string> {
-	try {
-		await execAsync("bun --version");
-		return "bun";
-	} catch (error) {
-		// Try npx bun as fallback
-		try {
-			await execAsync("npx bun --version");
-			return "npx bun";
-		} catch (npxError) {
-			throw new Error(
-				"Bun is required for server deployments. Please install Bun: https://bun.sh/docs/installation",
-			);
-		}
-	}
-}
-
 async function buildServerCode(
 	entryPath: string,
 	buildDir: string,
-	bunCommand: string,
 	spinner: ora.Ora,
 ): Promise<void> {
-	spinner.text = "Building server code...";
+	spinner.text = "Building server code with esbuild...";
 
-	const buildCommand = `${bunCommand} build ${entryPath} --outdir ${buildDir} --target node`;
+	// Ensure build directory exists
+	if (!fs.existsSync(buildDir)) {
+		fs.mkdirSync(buildDir, { recursive: true });
+	}
+
+	const outputPath = path.join(buildDir, "index.js");
 
 	try {
-		await execAsync(buildCommand);
+		// Build with esbuild for Cloudflare Workers
+		const result = await esbuild.build({
+			entryPoints: [entryPath],
+			bundle: true,
+			outfile: outputPath,
+			platform: "browser", // Cloudflare Workers use browser-like environment
+			target: ["es2020"], // Cloudflare Workers support ES2020
+			format: "esm", // ES modules format for Workers
+			minify: true,
+			sourcemap: false,
+			// Handle Node.js polyfills for Cloudflare Workers
+			define: {
+				"process.env.NODE_ENV": '"production"',
+			},
+			// External modules that Cloudflare Workers provide
+			external: [],
+			// Conditions for resolving imports
+			conditions: ["worker", "browser"],
+			// Main fields to check when resolving packages
+			mainFields: ["browser", "module", "main"],
+			// Ensure all dependencies are bundled
+			packages: "bundle",
+			// Handle potential Node.js specific imports
+			banner: {
+				js: `
+// Cloudflare Workers compatibility
+const process = { env: {} };
+const global = globalThis;
+				`.trim(),
+			},
+			// Plugins for handling specific scenarios
+			plugins: [
+				{
+					name: "node-polyfills",
+					setup(build) {
+						// Handle Node.js built-ins that might be imported
+						const nodeModules = [
+							"crypto",
+							"buffer",
+							"stream",
+							"util",
+							"events",
+							"path",
+							"url",
+							"querystring",
+							"fs",
+							"http",
+							"https",
+							"zlib",
+							"assert",
+						];
+
+						nodeModules.forEach((mod) => {
+							build.onResolve({ filter: new RegExp(`^${mod}$`) }, () => {
+								return {
+									path: mod,
+									namespace: "node-polyfill",
+								};
+							});
+
+							build.onLoad({ filter: /.*/, namespace: "node-polyfill" }, () => {
+								return {
+									contents: `export default {}; export const ${mod} = {};`,
+									loader: "js",
+								};
+							});
+						});
+					},
+				},
+			],
+		});
+
+		if (result.errors.length > 0) {
+			throw new Error(
+				`Build errors: ${result.errors.map((e) => e.text).join(", ")}`,
+			);
+		}
+
+		// Write metadata about the build
+		const metadata = {
+			built: new Date().toISOString(),
+			entryPoint: entryPath,
+			outputSize: fs.statSync(outputPath).size,
+		};
+		fs.writeFileSync(
+			path.join(buildDir, "build-metadata.json"),
+			JSON.stringify(metadata, null, 2),
+		);
+
 		spinner.text = "Server code built successfully";
 	} catch (error) {
 		throw new Error(`Build failed: ${error}`);
@@ -181,19 +257,16 @@ async function createServerConfig(): Promise<ServerConfig> {
 		},
 	]);
 
-	const bunCommand = await getBunCommand();
-
 	const config: ServerConfig = {
 		siteId: site.id,
 		entryPath,
-		buildCommand: `${bunCommand} build ${entryPath} --outdir ${buildDir} --target node`,
+		buildCommand: `esbuild ${entryPath} --bundle --outfile=${buildDir}/index.js --platform=browser --target=es2020 --format=esm --minify`,
 		buildDir,
-		runtime: "node",
+		runtime: "cloudflare-workers",
 	};
 
 	// Save configuration
 	fs.writeFileSync("orbiter.json", JSON.stringify(config, null, 2));
-	console.log("📝 Server configuration saved to orbiter.json");
 
 	return config;
 }
@@ -240,16 +313,8 @@ async function deployServer(configPath?: string): Promise<void> {
 			throw new Error(`Entry file not found: ${config.entryPath}`);
 		}
 
-		// Get Bun command
-		const bunCommand = await getBunCommand();
-
 		// Build the server code
-		await buildServerCode(
-			config.entryPath,
-			config.buildDir,
-			bunCommand,
-			spinner,
-		);
+		await buildServerCode(config.entryPath, config.buildDir, spinner);
 
 		// Read built script
 		const scriptContent = await readBuiltScript(config.buildDir);
@@ -261,7 +326,7 @@ async function deployServer(configPath?: string): Promise<void> {
 		const result = await deployToOrbiter(config.siteId, scriptContent, spinner);
 
 		spinner.succeed("Server deployment successful!");
-		console.log(`🔗 API URL: ${result.data.apiUrl}`);
+		console.log(`🌐 API URL: ${result.data.apiUrl}`);
 	} catch (error) {
 		spinner.fail("❌ Server deployment failed");
 		console.error("Error:", error);

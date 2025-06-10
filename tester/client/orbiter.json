@@ -1,0 +1,6 @@
+{
+  "siteId": "ba40dadc-7740-4df2-9f11-a80ae19d6f77",
+  "domain": "server-testing",
+  "buildCommand": "bun run build",
+  "buildDir": "dist"
+}
