@@ -181,8 +181,6 @@ async function deployToOrbiter(
 	scriptContent: string,
 	spinner: ora.Ora,
 ): Promise<DeploymentResponse> {
-	spinner.text = "Deploying to Orbiter...";
-
 	const tokens = await getValidTokens();
 	if (!tokens) {
 		throw new Error("Authentication required. Please login first.");
@@ -211,64 +209,78 @@ async function deployToOrbiter(
 }
 
 async function createServerConfig(): Promise<ServerConfig> {
-	// Get list of existing sites
-	const sites = await listSites();
+	const spinner = ora("Loading sites...").start();
 
-	if (!sites?.data?.length) {
-		throw new Error(
-			"No sites found. Please create a site first using 'orbiter create' or 'orbiter deploy'",
-		);
-	}
+	try {
+		// Get list of existing sites
+		const sites = await listSites();
 
-	const siteChoices = sites.data.map((site: any) => ({
-		name: `${site.domain} (${site.id})`,
-		value: { id: site.id, domain: site.domain },
-	}));
+		if (!sites?.data?.length) {
+			spinner.fail("No sites found");
+			throw new Error(
+				"No sites found. Please create a site first using 'orbiter create' or 'orbiter deploy'",
+			);
+		}
 
-	const { site } = await inquirer.prompt([
-		{
-			type: "list",
-			name: "site",
-			message: "Select a site to deploy the server to:",
-			choices: siteChoices,
-		},
-	]);
+		spinner.stop();
 
-	const { entryPath } = await inquirer.prompt([
-		{
-			type: "input",
-			name: "entryPath",
-			message: "Enter the path to your server entry file:",
-			default: "src/index.ts",
-			validate: (input) => {
-				if (!input.length) return "Entry path is required";
-				if (!fs.existsSync(input)) return "Entry file does not exist";
-				return true;
+		const siteChoices = sites.data.map((site: any) => ({
+			name: `${site.domain} (${site.id})`,
+			value: { id: site.id, domain: site.domain },
+		}));
+
+		const { site } = await inquirer.prompt([
+			{
+				type: "list",
+				name: "site",
+				message: "Select a site to deploy the server to:",
+				choices: siteChoices,
 			},
-		},
-	]);
+		]);
 
-	const { buildDir } = await inquirer.prompt([
-		{
-			type: "input",
-			name: "buildDir",
-			message: "Enter the build output directory:",
-			default: "dist",
-		},
-	]);
+		const { entryPath } = await inquirer.prompt([
+			{
+				type: "input",
+				name: "entryPath",
+				message: "Enter the path to your server entry file:",
+				default: "src/index.ts",
+				validate: (input) => {
+					if (!input.length) return "Entry path is required";
+					if (!fs.existsSync(input)) return "Entry file does not exist";
+					return true;
+				},
+			},
+		]);
 
-	const config: ServerConfig = {
-		siteId: site.id,
-		entryPath,
-		buildCommand: `esbuild ${entryPath} --bundle --outfile=${buildDir}/index.js --platform=browser --target=es2020 --format=esm --minify`,
-		buildDir,
-		runtime: "cloudflare-workers",
-	};
+		const { buildDir } = await inquirer.prompt([
+			{
+				type: "input",
+				name: "buildDir",
+				message: "Enter the build output directory:",
+				default: "dist",
+			},
+		]);
 
-	// Save configuration
-	fs.writeFileSync("orbiter.json", JSON.stringify(config, null, 2));
+		const config: ServerConfig = {
+			siteId: site.id,
+			entryPath,
+			buildCommand: `esbuild ${entryPath} --bundle --outfile=${buildDir}/index.js --platform=browser --target=es2020 --format=esm --minify`,
+			buildDir,
+			runtime: "cloudflare-workers",
+		};
 
-	return config;
+		// Save configuration
+		fs.writeFileSync("orbiter.json", JSON.stringify(config, null, 2));
+
+		const configSpinner = ora(
+			"Server configuration saved to orbiter.json",
+		).succeed();
+
+		return config;
+	} catch (error) {
+		spinner.fail("Failed to create server configuration");
+		throw error;
+	}
 }
 
 function loadServerConfig(
@@ -299,36 +311,35 @@ async function deployServer(configPath?: string): Promise<void> {
 
 	try {
 		// Check for existing configuration
+		spinner.text = "Looking for server configuration...";
 		let config = loadServerConfig(configPath);
 
 		if (!config) {
-			spinner.stop();
-			console.log("No server configuration found. Setting up...");
+			spinner.info("No server configuration found. Starting setup...");
 			config = await createServerConfig();
-			spinner.start("Preparing server deployment...");
-		}
-
-		// Validate entry file exists
-		if (!fs.existsSync(config.entryPath)) {
-			throw new Error(`Entry file not found: ${config.entryPath}`);
+			spinner.start("Configuration created");
+		} else {
+			spinner.text = "Server configuration loaded";
 		}
 
 		// Build the server code
+		spinner.text = "Building server code with esbuild...";
 		await buildServerCode(config.entryPath, config.buildDir, spinner);
+		spinner.text = "Build completed successfully";
 
 		// Read built script
+		spinner.text = "Reading built script...";
 		const scriptContent = await readBuiltScript(config.buildDir);
-
-		// Log deployment info
-		spinner.text = `Deploying server to Orbiter...`;
+		const bundleSize = (scriptContent.length / 1024).toFixed(2);
+		spinner.text = `Built bundle size: ${bundleSize} KB`;
 
 		// Deploy to Orbiter
+		spinner.text = "Deploying server to Orbiter...";
 		const result = await deployToOrbiter(config.siteId, scriptContent, spinner);
 
-		spinner.succeed("Server deployment successful!");
-		console.log(`🌐 API URL: ${result.data.apiUrl}`);
+		spinner.succeed(`Server deployed: ${result.data.apiUrl}`);
 	} catch (error) {
-		spinner.fail("❌ Server deployment failed");
+		spinner.fail("Server deployment failed");
 		console.error("Error:", error);
 		throw error;
 	}
