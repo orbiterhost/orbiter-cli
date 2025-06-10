@@ -15,14 +15,12 @@
 	},
 	"files": ["dist"],
 	"devDependencies": {
-		"@types/bun": "^1.2.15",
 		"@types/inquirer": "^9.0.7",
 		"@types/node": "^20.11.17",
 		"typescript": "^5.3.3"
 	},
 	"dependencies": {
 		"@supabase/supabase-js": "^2.47.10",
-		"bun": "^1.2.15",
 		"cmd-ts": "^0.13.0",
 		"commander": "^13.0.0",
 		"conf": "^13.1.0",
