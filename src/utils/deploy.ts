@@ -5,6 +5,11 @@ import inquirer from "inquirer";
 import ora from "ora";
 import { listSites, createSite, updateSite } from "./sites";
 import { promisify } from "util";
+import { getValidTokens } from "./auth";
+import { API_URL } from "../config";
+import esbuild from "esbuild";
+
+const SOURCE = process.env.SOURCE || "cli";
 
 const execAsync = promisify(exec);
 
@@ -15,6 +20,14 @@ interface OrbiterConfig {
 	buildDir: string;
 }
 
+interface ServerConfig {
+	siteId: string;
+	entryPath: string;
+	buildCommand: string;
+	buildDir: string;
+	runtime?: string;
+}
+
 interface DeploymentOptions {
 	domain?: string;
 	siteId?: string;
@@ -22,6 +35,314 @@ interface DeploymentOptions {
 	buildDir?: string;
 	spinner?: ora.Ora;
 	configPath?: string;
+	server?: boolean;
+}
+
+interface DeploymentResponse {
+	message: string;
+	data: {
+		siteId: string;
+		scriptName: string;
+		apiUrl: string;
+		apiEndpoint: string;
+		lastUpdated: string;
+	};
+}
+
+// Server deployment functions
+async function buildServerCode(
+	entryPath: string,
+	buildDir: string,
+	spinner: ora.Ora,
+): Promise<void> {
+	spinner.text = "Building server code with esbuild...";
+
+	// Ensure build directory exists
+	if (!fs.existsSync(buildDir)) {
+		fs.mkdirSync(buildDir, { recursive: true });
+	}
+
+	const outputPath = path.join(buildDir, "index.js");
+
+	try {
+		// Build with esbuild for Cloudflare Workers
+		const result = await esbuild.build({
+			entryPoints: [entryPath],
+			bundle: true,
+			outfile: outputPath,
+			platform: "browser", // Cloudflare Workers use browser-like environment
+			target: ["es2020"], // Cloudflare Workers support ES2020
+			format: "esm", // ES modules format for Workers
+			minify: true,
+			sourcemap: false,
+			// Handle Node.js polyfills for Cloudflare Workers
+			define: {
+				"process.env.NODE_ENV": '"production"',
+			},
+			// External modules that Cloudflare Workers provide
+			external: [],
+			// Conditions for resolving imports
+			conditions: ["worker", "browser"],
+			// Main fields to check when resolving packages
+			mainFields: ["browser", "module", "main"],
+			// Ensure all dependencies are bundled
+			packages: "bundle",
+			// Handle potential Node.js specific imports
+			banner: {
+				js: `
+// Cloudflare Workers compatibility
+const process = { env: {} };
+const global = globalThis;
+				`.trim(),
+			},
+			// Plugins for handling specific scenarios
+			plugins: [
+				{
+					name: "node-polyfills",
+					setup(build) {
+						// Handle Node.js built-ins that might be imported
+						const nodeModules = [
+							"crypto",
+							"buffer",
+							"stream",
+							"util",
+							"events",
+							"path",
+							"url",
+							"querystring",
+							"fs",
+							"http",
+							"https",
+							"zlib",
+							"assert",
+						];
+
+						nodeModules.forEach((mod) => {
+							build.onResolve({ filter: new RegExp(`^${mod}$`) }, () => {
+								return {
+									path: mod,
+									namespace: "node-polyfill",
+								};
+							});
+
+							build.onLoad({ filter: /.*/, namespace: "node-polyfill" }, () => {
+								return {
+									contents: `export default {}; export const ${mod} = {};`,
+									loader: "js",
+								};
+							});
+						});
+					},
+				},
+			],
+		});
+
+		if (result.errors.length > 0) {
+			throw new Error(
+				`Build errors: ${result.errors.map((e) => e.text).join(", ")}`,
+			);
+		}
+
+		// Write metadata about the build
+		const metadata = {
+			built: new Date().toISOString(),
+			entryPoint: entryPath,
+			outputSize: fs.statSync(outputPath).size,
+		};
+		fs.writeFileSync(
+			path.join(buildDir, "build-metadata.json"),
+			JSON.stringify(metadata, null, 2),
+		);
+
+		spinner.text = "Server code built successfully";
+	} catch (error) {
+		throw new Error(`Build failed: ${error}`);
+	}
+}
+
+async function readBuiltScript(buildDir: string): Promise<string> {
+	const scriptPath = path.join(buildDir, "index.js");
+
+	if (!fs.existsSync(scriptPath)) {
+		throw new Error(`Built script not found at ${scriptPath}`);
+	}
+
+	const scriptContent = fs.readFileSync(scriptPath, "utf8");
+
+	if (!scriptContent.trim()) {
+		throw new Error("Built script file is empty");
+	}
+
+	return scriptContent;
+}
+
+async function deployToOrbiter(
+	siteId: string,
+	scriptContent: string,
+	spinner: ora.Ora,
+): Promise<DeploymentResponse> {
+	const tokens = await getValidTokens();
+	if (!tokens) {
+		throw new Error("Authentication required. Please login first.");
+	}
+
+	const response = await fetch(`${API_URL}/functions/deploy/${siteId}`, {
+		method: "POST",
+		headers: {
+			Source: SOURCE,
+			"Content-Type": "application/json",
+			...(tokens.keyType === "apikey"
+				? { "X-Orbiter-API-Key": `${tokens.access_token}` }
+				: { "X-Orbiter-Token": tokens.access_token }),
+		},
+		body: JSON.stringify({
+			script: scriptContent,
+		}),
+	});
+
+	if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.message || "Deployment failed");
+	}
+
+	return await response.json();
+}
+
+async function createServerConfig(): Promise<ServerConfig> {
+	const spinner = ora("Loading sites...").start();
+
+	try {
+		// Get list of existing sites
+		const sites = await listSites();
+
+		if (!sites?.data?.length) {
+			spinner.fail("No sites found");
+			throw new Error(
+				"No sites found. Please create a site first using 'orbiter create' or 'orbiter deploy'",
+			);
+		}
+
+		spinner.stop();
+
+		const siteChoices = sites.data.map((site: any) => ({
+			name: `${site.domain} (${site.id})`,
+			value: { id: site.id, domain: site.domain },
+		}));
+
+		const { site } = await inquirer.prompt([
+			{
+				type: "list",
+				name: "site",
+				message: "Select a site to deploy the server to:",
+				choices: siteChoices,
+			},
+		]);
+
+		const { entryPath } = await inquirer.prompt([
+			{
+				type: "input",
+				name: "entryPath",
+				message: "Enter the path to your server entry file:",
+				default: "src/index.ts",
+				validate: (input) => {
+					if (!input.length) return "Entry path is required";
+					if (!fs.existsSync(input)) return "Entry file does not exist";
+					return true;
+				},
+			},
+		]);
+
+		const { buildDir } = await inquirer.prompt([
+			{
+				type: "input",
+				name: "buildDir",
+				message: "Enter the build output directory:",
+				default: "dist",
+			},
+		]);
+
+		const config: ServerConfig = {
+			siteId: site.id,
+			entryPath,
+			buildCommand: `esbuild ${entryPath} --bundle --outfile=${buildDir}/index.js --platform=browser --target=es2020 --format=esm --minify`,
+			buildDir,
+			runtime: "cloudflare-workers",
+		};
+
+		// Save configuration
+		fs.writeFileSync("orbiter.json", JSON.stringify(config, null, 2));
+
+		const configSpinner = ora(
+			"Server configuration saved to orbiter.json",
+		).succeed();
+
+		return config;
+	} catch (error) {
+		spinner.fail("Failed to create server configuration");
+		throw error;
+	}
+}
+
+function loadServerConfig(
+	configPath: string = "./orbiter.json",
+): ServerConfig | null {
+	if (!fs.existsSync(configPath)) {
+		return null;
+	}
+
+	try {
+		const content = fs.readFileSync(configPath, "utf8");
+		const config = JSON.parse(content) as ServerConfig;
+
+		// Validate required fields for server deployment
+		if (!config.siteId || !config.entryPath) {
+			return null;
+		}
+
+		return config;
+	} catch (error) {
+		console.warn("Warning: Could not parse orbiter.json");
+		return null;
+	}
+}
+
+async function deployServer(configPath?: string): Promise<void> {
+	const spinner = ora("Preparing server deployment...").start();
+
+	try {
+		// Check for existing configuration
+		spinner.text = "Looking for server configuration...";
+		let config = loadServerConfig(configPath);
+
+		if (!config) {
+			spinner.info("No server configuration found. Starting setup...");
+			config = await createServerConfig();
+			spinner.start("Configuration created");
+		} else {
+			spinner.text = "Server configuration loaded";
+		}
+
+		// Build the server code
+		spinner.text = "Building server code with esbuild...";
+		await buildServerCode(config.entryPath, config.buildDir, spinner);
+		spinner.text = "Build completed successfully";
+
+		// Read built script
+		spinner.text = "Reading built script...";
+		const scriptContent = await readBuiltScript(config.buildDir);
+		const bundleSize = (scriptContent.length / 1024).toFixed(2);
+		spinner.text = `Built bundle size: ${bundleSize} KB`;
+
+		// Deploy to Orbiter
+		spinner.text = "Deploying server to Orbiter...";
+		const result = await deployToOrbiter(config.siteId, scriptContent, spinner);
+
+		spinner.succeed(`Server deployed: ${result.data.apiUrl}`);
+	} catch (error) {
+		spinner.fail("Server deployment failed");
+		console.error("Error:", error);
+		throw error;
+	}
 }
 
 async function createNewDeployment(
@@ -125,6 +446,11 @@ async function createNewDeployment(
 }
 
 export async function deploySite(options?: DeploymentOptions) {
+	// Handle server deployment
+	if (options?.server) {
+		return await deployServer(options.configPath);
+	}
+
 	// Use existing spinner or create a new one
 	const spinner = options?.spinner || ora();
 	const shouldStartSpinner = !options?.spinner; // Only start if we created it

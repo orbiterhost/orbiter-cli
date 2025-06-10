@@ -4,12 +4,12 @@
 	"author": "Steve Simkins",
 	"license": "MIT",
 	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
+	"type": "module",
 	"bin": {
 		"orbiter": "./dist/index.js"
 	},
 	"scripts": {
-		"build": "tsup",
+		"build": "bun build src/index.ts --outdir dist --target node",
 		"dev": "bun run build && bun link",
 		"start": "bun ./dist/index.js"
 	},
@@ -17,8 +17,6 @@
 	"devDependencies": {
 		"@types/inquirer": "^9.0.7",
 		"@types/node": "^20.11.17",
-		"ts-node": "^10.9.2",
-		"tsup": "^8.0.1",
 		"typescript": "^5.3.3"
 	},
 	"dependencies": {
@@ -27,6 +25,7 @@
 		"commander": "^13.0.0",
 		"conf": "^13.1.0",
 		"dotenv": "^16.4.7",
+		"esbuild": "^0.25.5",
 		"express": "^4.21.2",
 		"figlet": "^1.8.0",
 		"inquirer": "^12.3.3",

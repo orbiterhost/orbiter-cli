@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import {
 	command,
 	subcommands,
@@ -7,6 +8,7 @@ import {
 	option,
 	positional,
 	optional,
+	flag,
 } from "cmd-ts";
 import { authenticateWithApiKey, login } from "./utils/auth";
 import {
@@ -247,9 +249,14 @@ const deployCmd = command({
 			description: "Optional path to existing orbiter.json config file",
 			defaultValue: undefined,
 		}),
+		server: flag({
+			long: "server",
+			description: "Deploy server/API code instead of static site",
+		}),
 	},
 	handler: async (args) => {
 		await deploySite({
+			server: args.server,
 			domain: args.domain,
 			siteId: args.siteId,
 			buildCommand: args.buildCommand,
