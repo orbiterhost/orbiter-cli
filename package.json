@@ -1,6 +1,6 @@
 {
 	"name": "orbiter-cli",
-	"version": "0.8.2",
+	"version": "0.8.3-beta.0",
 	"author": "Steve Simkins",
 	"license": "MIT",
 	"main": "./dist/index.js",
@@ -13,7 +13,9 @@
 		"dev": "bun run build && bun link",
 		"start": "bun ./dist/index.js"
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"devDependencies": {
 		"@types/inquirer": "^9.0.7",
 		"@types/node": "^20.11.17",
