@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0-beta.0] - 2025-06-10
+
+### ⚙️ Miscellaneous Tasks
+
+- Added env support
+
+## [0.8.3-beta.0] - 2025-06-10
+
+### 🚀 Features
+
+- Added optional config path for deploy
+- Initial function work
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Updated README
+- Formatted files
+- Added biome
+- Version bump
+- Refactored to use esbuild
+- Removed accidental test repo
+- Cleanup styles
+- Removed bun deps
+
 ## [0.8.1] - 2025-05-04
 
 ### ⚙️ Miscellaneous Tasks
