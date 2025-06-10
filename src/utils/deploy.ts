@@ -8,6 +8,7 @@ import { promisify } from "util";
 import { getValidTokens } from "./auth";
 import { API_URL } from "../config";
 import esbuild from "esbuild";
+import dotenv from "dotenv";
 
 const SOURCE = process.env.SOURCE || "cli";
 
@@ -36,6 +37,7 @@ interface DeploymentOptions {
 	spinner?: ora.Ora;
 	configPath?: string;
 	server?: boolean;
+	env?: boolean;
 }
 
 interface DeploymentResponse {
@@ -47,6 +49,31 @@ interface DeploymentResponse {
 		apiEndpoint: string;
 		lastUpdated: string;
 	};
+}
+
+interface EnvBinding {
+	name: string;
+	text: string;
+	type: "secret_text";
+}
+
+// Load environment variables from .env file if --env flag is present
+function loadEnvVariables(): Record<string, string> {
+	const envPath = path.join(process.cwd(), ".env");
+	if (fs.existsSync(envPath)) {
+		const result = dotenv.config({ path: envPath });
+		return result.parsed || {};
+	}
+	return {};
+}
+
+// Convert environment variables to bindings format
+function createEnvBindings(envVars: Record<string, string>): EnvBinding[] {
+	return Object.entries(envVars).map(([name, value]) => ({
+		name,
+		text: value,
+		type: "secret_text" as const,
+	}));
 }
 
 // Server deployment functions
@@ -65,7 +92,7 @@ async function buildServerCode(
 	const outputPath = path.join(buildDir, "index.js");
 
 	try {
-		// Build with esbuild for Cloudflare Workers
+		// Build with esbuild for Cloudflare Workers with process.env to c.env transformation
 		const result = await esbuild.build({
 			entryPoints: [entryPath],
 			bundle: true,
@@ -80,7 +107,7 @@ async function buildServerCode(
 				"process.env.NODE_ENV": '"production"',
 			},
 			// External modules that Cloudflare Workers provide
-			external: [],
+			external: ["dotenv"],
 			// Conditions for resolving imports
 			conditions: ["worker", "browser"],
 			// Main fields to check when resolving packages
@@ -98,39 +125,43 @@ const global = globalThis;
 			// Plugins for handling specific scenarios
 			plugins: [
 				{
-					name: "node-polyfills",
+					name: "cloudflare-transform",
 					setup(build) {
-						// Handle Node.js built-ins that might be imported
-						const nodeModules = [
-							"crypto",
-							"buffer",
-							"stream",
-							"util",
-							"events",
-							"path",
-							"url",
-							"querystring",
-							"fs",
-							"http",
-							"https",
-							"zlib",
-							"assert",
-						];
+						build.onLoad({ filter: /\.(ts|js)$/ }, async (args) => {
+							const fs = await import("fs/promises");
 
-						nodeModules.forEach((mod) => {
-							build.onResolve({ filter: new RegExp(`^${mod}$`) }, () => {
-								return {
-									path: mod,
-									namespace: "node-polyfill",
-								};
-							});
+							try {
+								let contents = await fs.readFile(args.path, "utf8");
+								const originalContents = contents;
 
-							build.onLoad({ filter: /.*/, namespace: "node-polyfill" }, () => {
+								// 1. Remove dotenv imports (comprehensive patterns)
+								const dotenvPatterns = [
+									/import\s+['"]dotenv\/config['"];?\s*\n?/g, // import 'dotenv/config'
+									/import\s+['"]dotenv['"];?\s*\n?/g, // import 'dotenv'
+									/import\s+\*\s+as\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import * as dotenv from 'dotenv'
+									/import\s+\{[^}]*\}\s+from\s+['"]dotenv['"];?\s*\n?/g, // import { config } from 'dotenv'
+									/import\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import dotenv from 'dotenv'
+									/require\s*\(\s*['"]dotenv[^'"]*['"]\s*\);?\s*\n?/g, // require('dotenv/config')
+									/const\s+\w+\s*=\s*require\s*\(\s*['"]dotenv['"];?\s*\n?/g, // const dotenv = require('dotenv')
+								];
+
+								dotenvPatterns.forEach((pattern) => {
+									contents = contents.replace(pattern, "");
+								});
+
+								// 2. Transform process.env to c.env
+								contents = contents.replace(
+									/process\.env\.([A-Z_][A-Z0-9_]*)/g,
+									"c.env.$1",
+								);
+
 								return {
-									contents: `export default {}; export const ${mod} = {};`,
-									loader: "js",
+									contents,
+									loader: args.path.endsWith(".ts") ? "ts" : "js",
 								};
-							});
+							} catch (error) {
+								return null; // Let esbuild handle it normally
+							}
 						});
 					},
 				},
@@ -179,12 +210,18 @@ async function readBuiltScript(buildDir: string): Promise<string> {
 async function deployToOrbiter(
 	siteId: string,
 	scriptContent: string,
+	envBindings: EnvBinding[],
 	spinner: ora.Ora,
 ): Promise<DeploymentResponse> {
 	const tokens = await getValidTokens();
 	if (!tokens) {
 		throw new Error("Authentication required. Please login first.");
 	}
+
+	const requestBody = {
+		script: scriptContent,
+		...(envBindings.length > 0 && { bindings: envBindings }),
+	};
 
 	const response = await fetch(`${API_URL}/functions/deploy/${siteId}`, {
 		method: "POST",
@@ -195,9 +232,7 @@ async function deployToOrbiter(
 				? { "X-Orbiter-API-Key": `${tokens.access_token}` }
 				: { "X-Orbiter-Token": tokens.access_token }),
 		},
-		body: JSON.stringify({
-			script: scriptContent,
-		}),
+		body: JSON.stringify(requestBody),
 	});
 
 	if (!response.ok) {
@@ -306,7 +341,10 @@ function loadServerConfig(
 	}
 }
 
-async function deployServer(configPath?: string): Promise<void> {
+async function deployServer(
+	configPath?: string,
+	useEnv?: boolean,
+): Promise<void> {
 	const spinner = ora("Preparing server deployment...").start();
 
 	try {
@@ -322,6 +360,19 @@ async function deployServer(configPath?: string): Promise<void> {
 			spinner.text = "Server configuration loaded";
 		}
 
+		// Load environment variables if --env flag is present
+		let envBindings: EnvBinding[] = [];
+		if (useEnv) {
+			spinner.text = "Loading environment variables from .env file...";
+			const envVars = loadEnvVariables();
+			envBindings = createEnvBindings(envVars);
+			if (envBindings.length > 0) {
+				spinner.text = `Loaded ${envBindings.length} environment variables`;
+			} else {
+				spinner.text = "No environment variables found in .env file";
+			}
+		}
+
 		// Build the server code
 		spinner.text = "Building server code with esbuild...";
 		await buildServerCode(config.entryPath, config.buildDir, spinner);
@@ -335,7 +386,12 @@ async function deployServer(configPath?: string): Promise<void> {
 
 		// Deploy to Orbiter
 		spinner.text = "Deploying server to Orbiter...";
-		const result = await deployToOrbiter(config.siteId, scriptContent, spinner);
+		const result = await deployToOrbiter(
+			config.siteId,
+			scriptContent,
+			envBindings,
+			spinner,
+		);
 
 		spinner.succeed(`Server deployed: ${result.data.apiUrl}`);
 	} catch (error) {
@@ -448,7 +504,7 @@ async function createNewDeployment(
 export async function deploySite(options?: DeploymentOptions) {
 	// Handle server deployment
 	if (options?.server) {
-		return await deployServer(options.configPath);
+		return await deployServer(options.configPath, options.env);
 	}
 
 	// Use existing spinner or create a new one

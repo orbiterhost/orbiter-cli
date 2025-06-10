@@ -253,6 +253,10 @@ const deployCmd = command({
 			long: "server",
 			description: "Deploy server/API code instead of static site",
 		}),
+		env: flag({
+			long: "env",
+			description: "Include local .env file variables with server deployment",
+		}),
 	},
 	handler: async (args) => {
 		await deploySite({
@@ -262,6 +266,7 @@ const deployCmd = command({
 			buildCommand: args.buildCommand,
 			buildDir: args.buildDir,
 			configPath: args.configPath,
+			env: args.env,
 		});
 	},
 });
