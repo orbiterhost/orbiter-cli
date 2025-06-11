@@ -24,6 +24,9 @@ import { deploySite } from "./utils/deploy";
 import figlet from "figlet";
 import { createInteractiveMiniApp } from "./utils/miniapp";
 import { createTemplateApp } from "./utils/template";
+import Univers from "./fonts/Univers.js";
+
+figlet.parseFont('Univers', Univers);
 
 const text = figlet.textSync("ORBITER", {
 	font: "Univers",
