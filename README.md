@@ -8,9 +8,6 @@ Before installing make sure you already have an account; sign up at [app.orbiter
 
 ## Installation
 
-> [!NOTE]
-> If you are using Windows please be sure to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) as the CLI does not have native support for Windows.
-
 The orbiter-cli is an NPM package you can download with manager of choice.
 
 ```bash
