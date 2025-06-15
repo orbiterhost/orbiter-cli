@@ -431,7 +431,9 @@ export async function createTemplateApp(
 							env: process.env,
 						});
 
-						spinner.succeed(`Server deployed successfully`);
+						spinner.succeed(
+							`Server deployed to: https://${domain}.orbiter.website/api/`,
+						);
 					} catch (serverDeployError) {
 						spinner.warn("Automatic server deployment failed");
 						console.log(
@@ -446,9 +448,6 @@ export async function createTemplateApp(
 			}
 
 			// Final success message
-			spinner.succeed(
-				`Server available at: https://${domain}.orbiter.website/api/`,
-			);
 		} finally {
 			// Restore the original working directory
 			process.chdir(originalCwd);
