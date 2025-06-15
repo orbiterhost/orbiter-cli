@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.3] - 2025-06-15
+
+### 🐛 Bug Fixes
+
+- Moved server deployment spinner to bhvr template only
+
+### ⚙️ Miscellaneous Tasks
+
+- Version bump
+
+## [0.9.2] - 2025-06-15
+
+### 🐛 Bug Fixes
+
+- Fixed how package.json writing is handled
+
+### ⚙️ Miscellaneous Tasks
+
+- Version bump
+
+## [0.9.1] - 2025-06-15
+
+### 🚀 Features
+
+- Added functions to bhvr deployment
+
+## [0.9.0-beta.1] - 2025-06-11
+
+### 🐛 Bug Fixes
+
+- Fixed figlet font import
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog
+
 ## [0.9.0-beta.0] - 2025-06-10
 
 ### ⚙️ Miscellaneous Tasks
