@@ -464,82 +464,33 @@ function copyTemplateFilesRecursive(
 	target: string,
 	options: TemplateOptions,
 ) {
-	// Get all items in the source directory
-	const items = fs.readdirSync(source);
+	// Copy everything except metadata files
+	fs.cpSync(source, target, {
+		recursive: true,
+		filter: (src) => {
+			const basename = path.basename(src);
+			return basename !== ".cache-meta.json" && basename !== "template.json";
+		},
+	});
 
-	for (const item of items) {
-		// Skip cache metadata and template metadata
-		if (item === ".cache-meta.json" || item === "template.json") {
-			continue;
+	// Process only the root package.json file
+	const rootPackageJsonPath = path.join(target, "package.json");
+	if (fs.existsSync(rootPackageJsonPath)) {
+		try {
+			const content = fs.readFileSync(rootPackageJsonPath, "utf8");
+			const packageJson = JSON.parse(content);
+
+			if (options.domain) {
+				packageJson.name = options.domain.toLowerCase().replace(/\s+/g, "-");
+			}
+
+			fs.writeFileSync(
+				rootPackageJsonPath,
+				JSON.stringify(packageJson, null, 2),
+			);
+		} catch (error) {
+			console.warn("Could not process root package.json:", error);
 		}
-
-		const sourcePath = path.join(source, item);
-		const targetPath = path.join(target, item);
-		const stat = fs.statSync(sourcePath);
-
-		if (stat.isDirectory()) {
-			// Create the directory in the target
-			fs.mkdirSync(targetPath, { recursive: true });
-			// Recursively copy content
-			copyTemplateFilesRecursive(sourcePath, targetPath, options);
-		} else {
-			// Process and copy the file
-			processAndCopyFile(sourcePath, targetPath, options);
-		}
-	}
-}
-
-/**
- * Process file content and write to target
- */
-function processAndCopyFile(
-	sourcePath: string,
-	targetPath: string,
-	options: TemplateOptions,
-) {
-	const content = fs.readFileSync(sourcePath, "utf8");
-
-	if (sourcePath.endsWith("package.json")) {
-		// Only process root package.json, not workspace package.json files
-		const isWorkspacePackage =
-			sourcePath.includes("/client/") ||
-			sourcePath.includes("\\client\\") ||
-			sourcePath.includes("/server/") ||
-			sourcePath.includes("\\server\\") ||
-			sourcePath.includes("/shared/") ||
-			sourcePath.includes("\\shared\\") ||
-			sourcePath.includes("/packages/") ||
-			sourcePath.includes("\\packages\\");
-
-		if (!isWorkspacePackage) {
-			// This is the root package.json, process it
-			const processedContent = processPackageJson(content, options);
-			fs.writeFileSync(targetPath, processedContent);
-		} else {
-			// This is a workspace package.json, copy as-is
-			fs.copyFileSync(sourcePath, targetPath);
-		}
-	} else {
-		// Copy file as-is for all other files
-		fs.copyFileSync(sourcePath, targetPath);
-	}
-}
-
-/**
- * Process package.json template
- */
-function processPackageJson(content: string, options: TemplateOptions): string {
-	try {
-		const packageJson = JSON.parse(content);
-
-		// Update the name based on the domain
-		packageJson.name =
-			options.domain?.toLowerCase().replace(/\s+/g, "-") || "my-app";
-
-		return JSON.stringify(packageJson, null, 2);
-	} catch (error) {
-		console.warn("Error processing package.json, using original", error);
-		return content;
 	}
 }
 
