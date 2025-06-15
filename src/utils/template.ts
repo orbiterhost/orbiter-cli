@@ -6,14 +6,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import fetch from "node-fetch";
 import inquirer from "inquirer";
-import {
-	buildServerCode,
-	readBuiltScript,
-	deployToOrbiter,
-	loadEnvVariables,
-	createEnvBindings,
-	deploySite,
-} from "./deploy";
+import { deploySite } from "./deploy";
 import { listSites } from "./sites";
 
 const SOURCE = process.env.SOURCE || "cli";
@@ -508,10 +501,27 @@ function processAndCopyFile(
 	const content = fs.readFileSync(sourcePath, "utf8");
 
 	if (sourcePath.endsWith("package.json")) {
-		const processedContent = processPackageJson(content, options, targetPath);
-		fs.writeFileSync(targetPath, processedContent);
+		// Only process root package.json, not workspace package.json files
+		const isWorkspacePackage =
+			sourcePath.includes("/client/") ||
+			sourcePath.includes("\\client\\") ||
+			sourcePath.includes("/server/") ||
+			sourcePath.includes("\\server\\") ||
+			sourcePath.includes("/shared/") ||
+			sourcePath.includes("\\shared\\") ||
+			sourcePath.includes("/packages/") ||
+			sourcePath.includes("\\packages\\");
+
+		if (!isWorkspacePackage) {
+			// This is the root package.json, process it
+			const processedContent = processPackageJson(content, options);
+			fs.writeFileSync(targetPath, processedContent);
+		} else {
+			// This is a workspace package.json, copy as-is
+			fs.copyFileSync(sourcePath, targetPath);
+		}
 	} else {
-		// Copy file as is for all other files
+		// Copy file as-is for all other files
 		fs.copyFileSync(sourcePath, targetPath);
 	}
 }
@@ -519,39 +529,13 @@ function processAndCopyFile(
 /**
  * Process package.json template
  */
-function processPackageJson(
-	content: string,
-	options: TemplateOptions,
-	filePath: string,
-): string {
+function processPackageJson(content: string, options: TemplateOptions): string {
 	try {
 		const packageJson = JSON.parse(content);
 
-		// Check if this is part of the bhvr template
-		const isBhvrTemplate =
-			filePath.includes("/bhvr") || filePath.includes("\\bhvr");
-
-		// For bhvr template, only modify the root package.json
-		if (isBhvrTemplate) {
-			// Check if this is the root package.json (not in client, server, or shared directories)
-			const isSubpackage =
-				filePath.includes("/client/") ||
-				filePath.includes("\\client\\") ||
-				filePath.includes("/server/") ||
-				filePath.includes("\\server\\") ||
-				filePath.includes("/shared/") ||
-				filePath.includes("\\shared\\");
-
-			// Only modify root package.json for bhvr template
-			if (!isSubpackage) {
-				packageJson.name =
-					options.domain?.toLowerCase().replace(/\s+/g, "-") || "my-app";
-			}
-		} else {
-			// For non-bhvr templates, modify the package name as usual
-			packageJson.name =
-				options.domain?.toLowerCase().replace(/\s+/g, "-") || "my-app";
-		}
+		// Update the name based on the domain
+		packageJson.name =
+			options.domain?.toLowerCase().replace(/\s+/g, "-") || "my-app";
 
 		return JSON.stringify(packageJson, null, 2);
 	} catch (error) {
