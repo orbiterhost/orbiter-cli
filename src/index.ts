@@ -26,7 +26,7 @@ import { createInteractiveMiniApp } from "./utils/miniapp";
 import { createTemplateApp } from "./utils/template";
 import Univers from "./fonts/Univers.js";
 
-figlet.parseFont('Univers', Univers);
+figlet.parseFont("Univers", Univers);
 
 const text = figlet.textSync("ORBITER", {
 	font: "Univers",
@@ -298,16 +298,23 @@ const createTemplateAppCmd = command({
 			displayName: "name",
 			description: "Name of the new project",
 		}),
+		template: option({
+			type: optional(string),
+			long: "template",
+			short: "t",
+			description: "Optional template you want to use",
+			defaultValue: undefined,
+		}),
 	},
 	handler: async (args) => {
-		await createTemplateApp(args.projectName);
+		await createTemplateApp(args.projectName, args.template);
 	},
 });
 
 const cli = subcommands({
 	name: "orbiter",
 	description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter login`,
-	version: "0.5.0",
+	version: "0.9.3",
 	cmds: {
 		login: loginCmd,
 		auth: authCmd,

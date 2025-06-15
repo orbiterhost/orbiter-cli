@@ -7,6 +7,7 @@ import { promisify } from "util";
 import fetch from "node-fetch";
 import inquirer from "inquirer";
 import { deploySite } from "./deploy";
+import { listSites } from "./sites";
 
 const SOURCE = process.env.SOURCE || "cli";
 const execAsync = promisify(exec);
@@ -197,7 +198,10 @@ export async function getTemplateMetadata(
 /**
  * Creates a new project from a template
  */
-export async function createTemplateApp(providedName?: string) {
+export async function createTemplateApp(
+	providedName?: string,
+	providedTemplate?: string,
+) {
 	const spinner = ora("Setting Up your app").start();
 	let projectName = providedName as string;
 
@@ -235,43 +239,79 @@ export async function createTemplateApp(providedName?: string) {
 			},
 		]);
 
-		// Choose template
-		spinner.text = "Fetching available templates...";
-		spinner.start();
-		const templates = await listAvailableTemplates();
-		spinner.stop();
+		let template: string;
 
-		if (templates.length === 0) {
-			throw new Error(
-				"No templates found. Please check your internet connection or try again later.",
-			);
+		if (providedTemplate) {
+			spinner.text = "Verifying template...";
+			spinner.start();
+			const templates = await listAvailableTemplates();
+
+			if (templates.includes(providedTemplate)) {
+				template = providedTemplate;
+				spinner.succeed(`Using template: ${template}`);
+			} else {
+				spinner.warn(`Template '${providedTemplate}' not found`);
+				spinner.stop();
+
+				// Fall back to template selection
+				const { selectedTemplate } = await inquirer.prompt([
+					{
+						type: "list",
+						name: "selectedTemplate",
+						message: "Select a template:",
+						choices: templates.map((t) => ({ name: t, value: t })),
+					},
+				]);
+				template = selectedTemplate;
+			}
+		} else {
+			// Choose template
+			spinner.text = "Fetching available templates...";
+			spinner.start();
+			const templates = await listAvailableTemplates();
+			spinner.stop();
+
+			if (templates.length === 0) {
+				throw new Error(
+					"No templates found. Please check your internet connection or try again later.",
+				);
+			}
+
+			const { selectedTemplate } = await inquirer.prompt([
+				{
+					type: "list",
+					name: "selectedTemplate",
+					message: "Select a template:",
+					choices: templates.map((t) => ({ name: t, value: t })),
+				},
+			]);
+			template = selectedTemplate;
 		}
 
-		const { template } = await inquirer.prompt([
-			{
-				type: "list",
-				name: "template",
-				message: "Select a template:",
-				choices: templates.map((t) => ({ name: t, value: t })),
-			},
-		]);
+		// Rest of the function remains the same
+		let packageManager: string;
+		let isBhvrTemplate = template === "bhvr";
 
-		const { packageManager } = await inquirer.prompt([
-			{
-				type: "list",
-				name: "packageManager",
-				message: "Select a package manager:",
-				choices: [
-					{ name: "npm", value: "npm" },
-					{ name: "yarn", value: "yarn" },
-					{ name: "pnpm", value: "pnpm" },
-					{ name: "bun", value: "bun" },
-				],
-				default: "npm",
-			},
-		]);
+		if (isBhvrTemplate) {
+			packageManager = "bun";
+		} else {
+			const { packageManager: choice } = await inquirer.prompt([
+				{
+					type: "list",
+					name: "packageManager",
+					message: "Select a package manager:",
+					choices: [
+						{ name: "npm", value: "npm" },
+						{ name: "yarn", value: "yarn" },
+						{ name: "pnpm", value: "pnpm" },
+						{ name: "bun", value: "bun" },
+					],
+					default: "npm",
+				},
+			]);
+			packageManager = choice;
+		}
 
-		// Create the project
 		spinner.text = `Creating project with ${template} template...`;
 		spinner.start();
 		const targetDir = path.join(process.cwd(), projectName);
@@ -292,8 +332,11 @@ export async function createTemplateApp(providedName?: string) {
 
 		let installCommand;
 		let buildCommand;
-		let workingDir = targetDir; // Default working directory
+		let clientWorkingDir = targetDir; // Default working directory
+		let serverWorkingDir = targetDir; // Default server directory
 		let buildOutputDir = "dist"; // Default build output directory
+		let serverEntryPath = "src/index.ts"; // Default server entry path
+		let siteId; // To store the site ID after client deployment
 
 		switch (packageManager) {
 			case "yarn":
@@ -316,13 +359,15 @@ export async function createTemplateApp(providedName?: string) {
 		}
 
 		// Special handling for bhvr monorepo template
-		if (template === "bhvr") {
+		if (isBhvrTemplate) {
 			// Install dependencies at the root level first
 			spinner.text = "Installing root dependencies...";
 			await execAsync(installCommand, { cwd: targetDir });
 
 			// Set client directory as the working directory for build and deploy
-			workingDir = path.join(targetDir, "client");
+			clientWorkingDir = path.join(targetDir, "client");
+			serverWorkingDir = path.join(targetDir, "server");
+			serverEntryPath = "src/index.ts";
 		} else {
 			// Standard template handling
 			spinner.text = "Installing dependencies...";
@@ -335,29 +380,80 @@ export async function createTemplateApp(providedName?: string) {
 		const originalCwd = process.cwd();
 
 		try {
-			// Change to the target directory
-			process.chdir(workingDir);
-
-			// Deploy directly using the deploySite function
-			spinner.text = "Deploying to Orbiter...";
+			// Deploy client first
+			spinner.text = "Deploying client to Orbiter...";
 			spinner.start();
-			// Pass the existing spinner to deploySite
+
+			// Change to the client directory
+			process.chdir(clientWorkingDir);
+
+			// Deploy client
 			await deploySite({
 				domain: domain,
 				buildCommand: buildCommand,
 				buildDir: buildOutputDir,
-				spinner: spinner, // Pass the spinner
+				spinner: spinner,
 			});
 
-			spinner.succeed(
-				`🚀 App deployed successfully to https://${domain}.orbiter.website`,
-			);
+			spinner.succeed(`Client deployed to https://${domain}.orbiter.website`);
+
+			// Get the site ID for server deployment if it's a bhvr template
+			if (isBhvrTemplate) {
+				// Get site information to retrieve site ID
+				const sites = await listSites(domain, false, spinner);
+				if (sites?.data?.[0]?.id) {
+					siteId = sites.data[0].id;
+
+					// Now deploy the server using the CLI command directly
+					spinner.text = "Deploying server component...";
+					spinner.start();
+
+					// Change to the server directory
+					process.chdir(serverWorkingDir);
+
+					// Create server config file
+					const serverConfig = {
+						siteId: siteId,
+						entryPath: serverEntryPath,
+						buildCommand: buildCommand,
+						buildDir: "dist",
+						runtime: "cloudflare-workers",
+					};
+
+					fs.writeFileSync(
+						"orbiter.json",
+						JSON.stringify(serverConfig, null, 2),
+					);
+
+					try {
+						// Execute the orbiter deploy --server command directly
+						await execAsync("orbiter deploy --server", {
+							env: process.env,
+						});
+
+						spinner.succeed(
+							`Server deployed to: https://${domain}.orbiter.website/api/`,
+						);
+					} catch (serverDeployError) {
+						spinner.warn("Automatic server deployment failed");
+						console.log(
+							`To manually deploy the server, run:\n  cd ${projectName}/server\n  orbiter deploy --server`,
+						);
+					}
+				} else {
+					spinner.warn(
+						"Could not retrieve site information for server deployment",
+					);
+				}
+			}
+
+			// Final success message
 		} finally {
 			// Restore the original working directory
 			process.chdir(originalCwd);
 		}
 	} catch (error) {
-		spinner.fail("Failed to create Mini App");
+		spinner.fail("Failed to create app");
 		console.error("Error:", error);
 	}
 }
@@ -404,10 +500,27 @@ function processAndCopyFile(
 	const content = fs.readFileSync(sourcePath, "utf8");
 
 	if (sourcePath.endsWith("package.json")) {
-		const processedContent = processPackageJson(content, options, targetPath);
-		fs.writeFileSync(targetPath, processedContent);
+		// Only process root package.json, not workspace package.json files
+		const isWorkspacePackage =
+			sourcePath.includes("/client/") ||
+			sourcePath.includes("\\client\\") ||
+			sourcePath.includes("/server/") ||
+			sourcePath.includes("\\server\\") ||
+			sourcePath.includes("/shared/") ||
+			sourcePath.includes("\\shared\\") ||
+			sourcePath.includes("/packages/") ||
+			sourcePath.includes("\\packages\\");
+
+		if (!isWorkspacePackage) {
+			// This is the root package.json, process it
+			const processedContent = processPackageJson(content, options);
+			fs.writeFileSync(targetPath, processedContent);
+		} else {
+			// This is a workspace package.json, copy as-is
+			fs.copyFileSync(sourcePath, targetPath);
+		}
 	} else {
-		// Copy file as is for all other files
+		// Copy file as-is for all other files
 		fs.copyFileSync(sourcePath, targetPath);
 	}
 }
@@ -415,39 +528,13 @@ function processAndCopyFile(
 /**
  * Process package.json template
  */
-function processPackageJson(
-	content: string,
-	options: TemplateOptions,
-	filePath: string,
-): string {
+function processPackageJson(content: string, options: TemplateOptions): string {
 	try {
 		const packageJson = JSON.parse(content);
 
-		// Check if this is part of the bhvr template
-		const isBhvrTemplate =
-			filePath.includes("/bhvr") || filePath.includes("\\bhvr");
-
-		// For bhvr template, only modify the root package.json
-		if (isBhvrTemplate) {
-			// Check if this is the root package.json (not in client, server, or shared directories)
-			const isSubpackage =
-				filePath.includes("/client/") ||
-				filePath.includes("\\client\\") ||
-				filePath.includes("/server/") ||
-				filePath.includes("\\server\\") ||
-				filePath.includes("/shared/") ||
-				filePath.includes("\\shared\\");
-
-			// Only modify root package.json for bhvr template
-			if (!isSubpackage) {
-				packageJson.name =
-					options.domain?.toLowerCase().replace(/\s+/g, "-") || "my-app";
-			}
-		} else {
-			// For non-bhvr templates, modify the package name as usual
-			packageJson.name =
-				options.domain?.toLowerCase().replace(/\s+/g, "-") || "my-app";
-		}
+		// Update the name based on the domain
+		packageJson.name =
+			options.domain?.toLowerCase().replace(/\s+/g, "-") || "my-app";
 
 		return JSON.stringify(packageJson, null, 2);
 	} catch (error) {

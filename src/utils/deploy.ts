@@ -58,7 +58,7 @@ interface EnvBinding {
 }
 
 // Load environment variables from .env file if --env flag is present
-function loadEnvVariables(): Record<string, string> {
+export function loadEnvVariables(): Record<string, string> {
 	const envPath = path.join(process.cwd(), ".env");
 	if (fs.existsSync(envPath)) {
 		const result = dotenv.config({ path: envPath });
@@ -68,7 +68,9 @@ function loadEnvVariables(): Record<string, string> {
 }
 
 // Convert environment variables to bindings format
-function createEnvBindings(envVars: Record<string, string>): EnvBinding[] {
+export function createEnvBindings(
+	envVars: Record<string, string>,
+): EnvBinding[] {
 	return Object.entries(envVars).map(([name, value]) => ({
 		name,
 		text: value,
@@ -77,7 +79,7 @@ function createEnvBindings(envVars: Record<string, string>): EnvBinding[] {
 }
 
 // Server deployment functions
-async function buildServerCode(
+export async function buildServerCode(
 	entryPath: string,
 	buildDir: string,
 	spinner: ora.Ora,
@@ -191,7 +193,7 @@ const global = globalThis;
 	}
 }
 
-async function readBuiltScript(buildDir: string): Promise<string> {
+export async function readBuiltScript(buildDir: string): Promise<string> {
 	const scriptPath = path.join(buildDir, "index.js");
 
 	if (!fs.existsSync(scriptPath)) {
@@ -207,7 +209,7 @@ async function readBuiltScript(buildDir: string): Promise<string> {
 	return scriptContent;
 }
 
-async function deployToOrbiter(
+export async function deployToOrbiter(
 	siteId: string,
 	scriptContent: string,
 	envBindings: EnvBinding[],
