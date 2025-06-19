@@ -19,7 +19,7 @@ import {
 	rollbackSite,
 	updateSite,
 } from "./utils/sites";
-import { deploySite } from "./utils/deploy";
+import { deployServerCommand, deploySite } from "./utils/deploy";
 //@ts-ignore
 import figlet from "figlet";
 import { createInteractiveMiniApp } from "./utils/miniapp";
@@ -311,6 +311,62 @@ const createTemplateAppCmd = command({
 	},
 });
 
+const deployServerCmd = command({
+	name: "deploy-server",
+	description: "Deploy server/API code to Orbiter",
+	args: {
+		siteId: option({
+			type: optional(string),
+			long: "siteId",
+			short: "s",
+			description: "ID of existing site to deploy server to",
+			defaultValue: undefined,
+		}),
+		entryFile: option({
+			type: optional(string),
+			long: "entryFile",
+			short: "e",
+			description: "Path to server entry file (e.g., src/index.ts)",
+			defaultValue: undefined,
+		}),
+		buildDir: option({
+			type: optional(string),
+			long: "buildDir",
+			short: "o",
+			description: "Output directory for build",
+			defaultValue: undefined,
+		}),
+		buildCommand: option({
+			type: optional(string),
+			long: "buildCommand",
+			short: "b",
+			description: "Custom build command (optional - esbuild used by default)",
+			defaultValue: undefined,
+		}),
+		configPath: option({
+			type: optional(string),
+			long: "config",
+			short: "c",
+			description: "Path to existing orbiter.json config file",
+			defaultValue: undefined,
+		}),
+		env: flag({
+			long: "env",
+			description: "Include local .env file variables with server deployment",
+		}),
+	},
+	handler: async (args) => {
+		await deployServerCommand({
+			siteId: args.siteId,
+			entryFile: args.entryFile,
+			buildDir: args.buildDir,
+			buildCommand: args.buildCommand,
+			configPath: args.configPath,
+			env: args.env,
+		});
+	},
+});
+
 const cli = subcommands({
 	name: "orbiter",
 	description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter auth`,
@@ -325,6 +381,7 @@ const cli = subcommands({
 		rollback: rollbackCmd,
 		delete: deleteCmd,
 		deploy: deployCmd,
+		"deploy-server": deployServerCmd,
 		miniapp: createMiniAppCmd,
 		new: createTemplateAppCmd,
 	},
