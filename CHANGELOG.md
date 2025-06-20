@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.6] - 2025-06-20
+
+### ⚙️ Miscellaneous Tasks
+
+- Added graceful error handling to server deployment
+- Added graceful error handling in client deployment
+
+## [0.9.5] - 2025-06-19
+
+### 🚀 Features
+
+- Added deploy-server command for granular control
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog
+- Simplified processing logic for templates
+- Version bump
+
 ## [0.9.3] - 2025-06-15
 
 ### 🐛 Bug Fixes
