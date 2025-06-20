@@ -388,12 +388,18 @@ export async function createTemplateApp(
 			process.chdir(clientWorkingDir);
 
 			// Deploy client
-			await deploySite({
+			const deploySuccess = await deploySite({
 				domain: domain,
 				buildCommand: buildCommand,
 				buildDir: buildOutputDir,
 				spinner: spinner,
 			});
+
+			if (!deploySuccess) {
+				// Deployment failed, deploySite already handled the error message
+				// Don't call spinner.succeed(), just return or handle the failure
+				return;
+			}
 
 			spinner.succeed(`Client deployed to https://${domain}.orbiter.website`);
 

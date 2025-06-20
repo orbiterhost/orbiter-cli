@@ -785,10 +785,15 @@ async function createNewDeployment(
 	return config;
 }
 
-export async function deploySite(options?: DeploymentOptions) {
+export async function deploySite(options?: DeploymentOptions): Promise<boolean> {
 	// Handle server deployment
 	if (options?.server) {
-		return await deployServer(options.configPath, options.env);
+    try {
+      await deployServer(options.configPath, options.env);
+      return true
+    } catch (error) {
+      return false
+    }
 	}
 
 	// Use existing spinner or create a new one
@@ -848,6 +853,7 @@ export async function deploySite(options?: DeploymentOptions) {
 				spinner.succeed(
 					`Site updated: https://${config.domain}.orbiter.website`,
 				);
+				return true
 		} else {
 			if (shouldStartSpinner)
 				spinner.start(
@@ -856,7 +862,14 @@ export async function deploySite(options?: DeploymentOptions) {
 			else
 				spinner.text = `Creating new site: https://${config.domain}.orbiter.website`;
 
-			await createSite(config.buildDir, config.domain, true);
+				const createResult = await createSite(config.buildDir, config.domain, true);
+
+				// Check if creation failed due to site limit (createSite returns undefined on failure)
+				if (!createResult) {
+					// The error message was already shown in createSite, just return
+					spinner.stop()
+					return false;
+				}
 
 			// Update config with new site ID
 			const sites = await listSites(config.domain, false, spinner);
@@ -868,10 +881,12 @@ export async function deploySite(options?: DeploymentOptions) {
 				spinner.succeed(
 					`Site deployed: https://${config.domain}.orbiter.website`,
 				);
+			return true
 		}
 	} catch (error) {
 		if (shouldStartSpinner) spinner.fail("Deployment failed");
 		else spinner.text = "Deployment failed";
 		console.error("Error:", error);
+		return false
 	}
 }

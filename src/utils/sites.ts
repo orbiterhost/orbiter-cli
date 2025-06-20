@@ -26,7 +26,7 @@ export async function createSite(
 	path: string,
 	domain: string,
 	useExistingSpinner?: boolean,
-) {
+): Promise<boolean> {
 	const spinner = useExistingSpinner ? null : ora("Creating site...").start();
 	try {
 		const { subdomain } = normalizeDomain(domain);
@@ -39,7 +39,7 @@ export async function createSite(
 			} else {
 				console.error(`Error: ${uploadResponse.error}`);
 			}
-			return;
+			return false;
 		}
 
 		const upload = uploadResponse.data;
@@ -50,7 +50,7 @@ export async function createSite(
 			if (spinner) {
 				spinner.stop();
 			}
-			return;
+			return false;
 		}
 
 		if (tokens.keyType === "oauth") {
@@ -69,7 +69,7 @@ export async function createSite(
 				if (spinner) {
 					spinner.stop();
 				}
-				return;
+				return false
 			}
 		}
 
@@ -92,18 +92,28 @@ export async function createSite(
 			if (spinner) {
 				spinner.stop();
 			}
-			console.error("Problem creating site:", result);
-			return;
+			if (result.message && result.message.toLowerCase().includes("site limit")) {
+				console.log("\n\x1b[31m/////// HOUSTON, WE HAVE A PROBLEM! ///////\x1b[0m");
+				console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
+				console.log("\x1b[31m///// YOU'VE HIT YOUR SITE LIMIT! /////////\x1b[0m");
+				console.log("\x1b[31m/// UPGRADE TO UNLOCK MORE SITES //////////\x1b[0m");
+				console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
+				console.log("\n\x1b[31m🚀 MISSION CONTROL: https://app.orbiter.host/billing\x1b[0m\n");
+			} else {
+				console.error("Problem creating site:", result);
+			}
+			return false;
 		}
 		if (spinner) {
 			spinner.succeed(`Site created: https://${subdomain}.orbiter.website`);
 		}
-		return;
+		return true;
 	} catch (error) {
 		if (spinner) {
 			spinner.stop();
 		}
 		console.log(error);
+		return false
 	}
 }
 
