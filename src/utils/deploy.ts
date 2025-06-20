@@ -231,7 +231,7 @@ export async function deployToOrbiter(
 	scriptContent: string,
 	envBindings: EnvBinding[],
 	spinner: ora.Ora,
-): Promise<DeploymentResponse> {
+): Promise<DeploymentResponse | null> {
 	const tokens = await getValidTokens();
 	if (!tokens) {
 		throw new Error("Authentication required. Please login first.");
@@ -256,6 +256,17 @@ export async function deployToOrbiter(
 
 	if (!response.ok) {
 		const errorData = await response.json();
+		if (response.status === 401) {
+			// Show upgrade message and stop spinner properly
+			spinner.stop();
+			console.log("\n\x1b[31m/////// HOUSTON, WE HAVE A PROBLEM! ///////\x1b[0m");
+				console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
+				console.log("\x1b[31m/// SERVER FUNCTIONS NEED A PAID PLAN /////\x1b[0m");
+				console.log("\x1b[31m/// UPGRADE TO UNLOCK ORBITAL DEPLOYMENT //\x1b[0m");
+				console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
+	console.log("\n\x1b[31m🚀 MISSION CONTROL: https://app.orbiter.host/billing\x1b[0m\n");
+			return null;
+		}
 		throw new Error(errorData.message || "Deployment failed");
 	}
 
@@ -428,7 +439,11 @@ async function deployServer(
 			spinner,
 		);
 
-		spinner.succeed(`Server deployed: ${result.data.apiUrl}`);
+		if (!result) {
+			return; // Exit gracefully without showing success message
+		}
+
+		spinner.succeed(`Server deployed: ${result?.data.apiUrl}`);
 	} catch (error) {
 		spinner.fail("Server deployment failed");
 		console.error("Error:", error);
@@ -519,13 +534,18 @@ export async function deployServerCommand(
 			spinner,
 		);
 
+		if (!result) {
+			spinner.stop();
+			return; // Exit gracefully without throwing error
+		}
+
 		// Save configuration for future use
 		if (!fs.existsSync("orbiter.json")) {
 			fs.writeFileSync("orbiter.json", JSON.stringify(config, null, 2));
 			spinner.text = "Configuration saved to orbiter.json";
 		}
 
-		spinner.succeed(`Server deployed: ${result.data.apiUrl}`);
+		spinner.succeed(`Server deployed: ${result?.data.apiUrl}`);
 	} catch (error) {
 		spinner.fail("Server deployment failed");
 		console.error("Error:", error);

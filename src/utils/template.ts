@@ -427,18 +427,41 @@ export async function createTemplateApp(
 
 					try {
 						// Execute the orbiter deploy --server command directly
-						await execAsync("orbiter deploy --server", {
-							env: process.env,
-						});
-
-						spinner.succeed(
-							`Server deployed to: https://${domain}.orbiter.website/api/`,
+						const { stdout, stderr } = await execAsync(
+							"orbiter deploy --server",
+							{
+								env: process.env,
+							},
 						);
-					} catch (serverDeployError) {
+
+						if (
+							stdout &&
+							stdout.includes("HOUSTON")
+						) {
+							// The upgrade message was already shown by the CLI, just add additional context
+							spinner.stop();
+						console.log("\n\x1b[31m/////// HOUSTON, WE HAVE A PROBLEM! ///////\x1b[0m");
+							console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
+							console.log("\x1b[31m/// SERVER FUNCTIONS NEED A PAID PLAN /////\x1b[0m");
+							console.log("\x1b[31m/// UPGRADE TO UNLOCK ORBITAL DEPLOYMENT //\x1b[0m");
+							console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
+				console.log("\n\x1b[31m🚀 MISSION CONTROL: https://app.orbiter.host/billing\x1b[0m\n");
+
+							console.log("\nOnce upgraded, deploy the server with:");
+							console.log(`  cd ${projectName}/server`);
+							console.log("  orbiter deploy --server\n");
+						} else {
+							// Successful deployment
+							spinner.succeed(
+								`Server deployed to: https://${domain}.orbiter.website/api/`,
+							);
+						}
+					} catch (serverDeployError: any) {
 						spinner.warn("Automatic server deployment failed");
 						console.log(
 							`To manually deploy the server, run:\n  cd ${projectName}/server\n  orbiter deploy --server`,
 						);
+						console.log("Error details:", serverDeployError.message);
 					}
 				} else {
 					spinner.warn(
