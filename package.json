@@ -23,6 +23,7 @@
 	},
 	"dependencies": {
 		"@supabase/supabase-js": "^2.47.10",
+		"@types/bun": "^1.2.19",
 		"cmd-ts": "^0.13.0",
 		"commander": "^13.0.0",
 		"conf": "^13.1.0",
