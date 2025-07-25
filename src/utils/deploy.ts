@@ -10,6 +10,11 @@ import { API_URL } from "../config";
 import esbuild from "esbuild";
 import dotenv from "dotenv";
 
+// Detect if running under bun
+function isBunRuntime(): boolean {
+	return typeof Bun !== "undefined" || process.versions.bun !== undefined;
+}
+
 const SOURCE = process.env.SOURCE || "cli";
 
 const execAsync = promisify(exec);
@@ -95,13 +100,67 @@ export function createEnvBindings(
 	}));
 }
 
+// Build server code with bun if available, otherwise use esbuild
+async function buildWithBun(
+	entryPath: string,
+	buildDir: string,
+	spinner: ora.Ora,
+): Promise<void> {
+	const outputPath = path.join(buildDir, "index.js");
+
+	// Create a temporary build script for bun
+	const tempDir = path.join(buildDir, ".temp");
+	if (!fs.existsSync(tempDir)) {
+		fs.mkdirSync(tempDir, { recursive: true });
+	}
+
+	const tempEntryPath = path.join(tempDir, "entry.ts");
+
+	// Read the original entry file and transform it
+	let originalCode = fs.readFileSync(entryPath, "utf8");
+
+	// Transform process.env to c.env and remove dotenv imports
+	const transformedCode = originalCode
+		.replace(/import\s+['"]dotenv\/config['"];?\s*\n?/g, "")
+		.replace(/import\s+['"]dotenv['"];?\s*\n?/g, "")
+		.replace(/import\s+\*\s+as\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, "")
+		.replace(/import\s+\{[^}]*\}\s+from\s+['"]dotenv['"];?\s*\n?/g, "")
+		.replace(/import\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, "")
+		.replace(/require\s*\(\s*['"]dotenv[^'"]*['"]\s*\);?\s*\n?/g, "")
+		.replace(/const\s+\w+\s*=\s*require\s*\(\s*['"]dotenv['"];?\s*\n?/g, "")
+		.replace(/process\.env\.([A-Z_][A-Z0-9_]*)/g, "c.env.$1");
+
+	// Add Cloudflare Workers compatibility banner
+	const finalCode = `// Cloudflare Workers compatibility
+const process = { env: {} };
+const global = globalThis;
+
+${transformedCode}`;
+
+	fs.writeFileSync(tempEntryPath, finalCode);
+
+	try {
+		// Use bun build command
+		const bunBuildCommand = `bun build ${tempEntryPath} --outfile ${outputPath} --target browser --format esm --minify`;
+		await execAsync(bunBuildCommand);
+
+		// Clean up temp files
+		fs.rmSync(tempDir, { recursive: true, force: true });
+	} catch (error) {
+		// Clean up temp files on error
+		fs.rmSync(tempDir, { recursive: true, force: true });
+		throw error;
+	}
+}
+
 // Server deployment functions
 export async function buildServerCode(
 	entryPath: string,
 	buildDir: string,
 	spinner: ora.Ora,
 ): Promise<void> {
-	spinner.text = "Building server code with esbuild...";
+	const useBun = isBunRuntime();
+	spinner.text = `Building server code with ${useBun ? "bun" : "esbuild"}...`;
 
 	// Ensure build directory exists
 	if (!fs.existsSync(buildDir)) {
@@ -111,86 +170,90 @@ export async function buildServerCode(
 	const outputPath = path.join(buildDir, "index.js");
 
 	try {
-		// Build with esbuild for Cloudflare Workers with process.env to c.env transformation
-		const result = await esbuild.build({
-			entryPoints: [entryPath],
-			bundle: true,
-			outfile: outputPath,
-			platform: "browser", // Cloudflare Workers use browser-like environment
-			target: ["es2020"], // Cloudflare Workers support ES2020
-			format: "esm", // ES modules format for Workers
-			minify: true,
-			sourcemap: false,
-			// Handle Node.js polyfills for Cloudflare Workers
-			define: {
-				"process.env.NODE_ENV": '"production"',
-			},
-			// External modules that Cloudflare Workers provide
-			external: ["dotenv"],
-			// Conditions for resolving imports
-			conditions: ["worker", "browser"],
-			// Main fields to check when resolving packages
-			mainFields: ["browser", "module", "main"],
-			// Ensure all dependencies are bundled
-			packages: "bundle",
-			// Handle potential Node.js specific imports
-			banner: {
-				js: `
+		if (useBun) {
+			await buildWithBun(entryPath, buildDir, spinner);
+		} else {
+			// Build with esbuild for Cloudflare Workers with process.env to c.env transformation
+			const result = await esbuild.build({
+				entryPoints: [entryPath],
+				bundle: true,
+				outfile: outputPath,
+				platform: "browser", // Cloudflare Workers use browser-like environment
+				target: ["es2020"], // Cloudflare Workers support ES2020
+				format: "esm", // ES modules format for Workers
+				minify: true,
+				sourcemap: false,
+				// Handle Node.js polyfills for Cloudflare Workers
+				define: {
+					"process.env.NODE_ENV": '"production"',
+				},
+				// External modules that Cloudflare Workers provide
+				external: ["dotenv"],
+				// Conditions for resolving imports
+				conditions: ["worker", "browser"],
+				// Main fields to check when resolving packages
+				mainFields: ["browser", "module", "main"],
+				// Ensure all dependencies are bundled
+				packages: "bundle",
+				// Handle potential Node.js specific imports
+				banner: {
+					js: `
 // Cloudflare Workers compatibility
 const process = { env: {} };
 const global = globalThis;
-				`.trim(),
-			},
-			// Plugins for handling specific scenarios
-			plugins: [
-				{
-					name: "cloudflare-transform",
-					setup(build) {
-						build.onLoad({ filter: /\.(ts|js)$/ }, async (args) => {
-							const fs = await import("fs/promises");
-
-							try {
-								let contents = await fs.readFile(args.path, "utf8");
-								const originalContents = contents;
-
-								// 1. Remove dotenv imports (comprehensive patterns)
-								const dotenvPatterns = [
-									/import\s+['"]dotenv\/config['"];?\s*\n?/g, // import 'dotenv/config'
-									/import\s+['"]dotenv['"];?\s*\n?/g, // import 'dotenv'
-									/import\s+\*\s+as\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import * as dotenv from 'dotenv'
-									/import\s+\{[^}]*\}\s+from\s+['"]dotenv['"];?\s*\n?/g, // import { config } from 'dotenv'
-									/import\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import dotenv from 'dotenv'
-									/require\s*\(\s*['"]dotenv[^'"]*['"]\s*\);?\s*\n?/g, // require('dotenv/config')
-									/const\s+\w+\s*=\s*require\s*\(\s*['"]dotenv['"];?\s*\n?/g, // const dotenv = require('dotenv')
-								];
-
-								dotenvPatterns.forEach((pattern) => {
-									contents = contents.replace(pattern, "");
-								});
-
-								// 2. Transform process.env to c.env
-								contents = contents.replace(
-									/process\.env\.([A-Z_][A-Z0-9_]*)/g,
-									"c.env.$1",
-								);
-
-								return {
-									contents,
-									loader: args.path.endsWith(".ts") ? "ts" : "js",
-								};
-							} catch (error) {
-								return null; // Let esbuild handle it normally
-							}
-						});
-					},
+					`.trim(),
 				},
-			],
-		});
+				// Plugins for handling specific scenarios
+				plugins: [
+					{
+						name: "cloudflare-transform",
+						setup(build) {
+							build.onLoad({ filter: /\.(ts|js)$/ }, async (args) => {
+								const fs = await import("fs/promises");
 
-		if (result.errors.length > 0) {
-			throw new Error(
-				`Build errors: ${result.errors.map((e) => e.text).join(", ")}`,
-			);
+								try {
+									let contents = await fs.readFile(args.path, "utf8");
+									const originalContents = contents;
+
+									// 1. Remove dotenv imports (comprehensive patterns)
+									const dotenvPatterns = [
+										/import\s+['"]dotenv\/config['"];?\s*\n?/g, // import 'dotenv/config'
+										/import\s+['"]dotenv['"];?\s*\n?/g, // import 'dotenv'
+										/import\s+\*\s+as\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import * as dotenv from 'dotenv'
+										/import\s+\{[^}]*\}\s+from\s+['"]dotenv['"];?\s*\n?/g, // import { config } from 'dotenv'
+										/import\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import dotenv from 'dotenv'
+										/require\s*\(\s*['"]dotenv[^'"]*['"]\s*\);?\s*\n?/g, // require('dotenv/config')
+										/const\s+\w+\s*=\s*require\s*\(\s*['"]dotenv['"];?\s*\n?/g, // const dotenv = require('dotenv')
+									];
+
+									dotenvPatterns.forEach((pattern) => {
+										contents = contents.replace(pattern, "");
+									});
+
+									// 2. Transform process.env to c.env
+									contents = contents.replace(
+										/process\.env\.([A-Z_][A-Z0-9_]*)/g,
+										"c.env.$1",
+									);
+
+									return {
+										contents,
+										loader: args.path.endsWith(".ts") ? "ts" : "js",
+									};
+								} catch (error) {
+									return null; // Let esbuild handle it normally
+								}
+							});
+						},
+					},
+				],
+			});
+
+			if (result.errors.length > 0) {
+				throw new Error(
+					`Build errors: ${result.errors.map((e) => e.text).join(", ")}`,
+				);
+			}
 		}
 
 		// Write metadata about the build
@@ -259,12 +322,16 @@ export async function deployToOrbiter(
 		if (response.status === 401) {
 			// Show upgrade message and stop spinner properly
 			spinner.stop();
-			console.log("\n\x1b[31m/////// HOUSTON, WE HAVE A PROBLEM! ///////\x1b[0m");
-				console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
-				console.log("\x1b[31m/// SERVER FUNCTIONS NEED A PAID PLAN /////\x1b[0m");
-				console.log("\x1b[31m/// UPGRADE TO UNLOCK ORBITAL DEPLOYMENT //\x1b[0m");
-				console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
-	console.log("\n\x1b[31m🚀 MISSION CONTROL: https://app.orbiter.host/billing\x1b[0m\n");
+			console.log(
+				"\n\x1b[31m/////// HOUSTON, WE HAVE A PROBLEM! ///////\x1b[0m",
+			);
+			console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
+			console.log("\x1b[31m/// SERVER FUNCTIONS NEED A PAID PLAN /////\x1b[0m");
+			console.log("\x1b[31m/// UPGRADE TO UNLOCK ORBITAL DEPLOYMENT //\x1b[0m");
+			console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
+			console.log(
+				"\n\x1b[31m🚀 MISSION CONTROL: https://app.orbiter.host/billing\x1b[0m\n",
+			);
 			return null;
 		}
 		throw new Error(errorData.message || "Deployment failed");
@@ -570,6 +637,9 @@ function generateDefaultBuildCommand(
 	entryFile: string,
 	buildDir: string,
 ): string {
+	if (isBunRuntime()) {
+		return `bun build ${entryFile} --outfile ${buildDir}/index.js --target browser --format esm --minify`;
+	}
 	return `esbuild ${entryFile} --bundle --outfile=${buildDir}/index.js --platform=browser --target=es2020 --format=esm --minify`;
 }
 
@@ -785,15 +855,17 @@ async function createNewDeployment(
 	return config;
 }
 
-export async function deploySite(options?: DeploymentOptions): Promise<boolean> {
+export async function deploySite(
+	options?: DeploymentOptions,
+): Promise<boolean> {
 	// Handle server deployment
 	if (options?.server) {
-    try {
-      await deployServer(options.configPath, options.env);
-      return true
-    } catch (error) {
-      return false
-    }
+		try {
+			await deployServer(options.configPath, options.env);
+			return true;
+		} catch (error) {
+			return false;
+		}
 	}
 
 	// Use existing spinner or create a new one
@@ -853,7 +925,7 @@ export async function deploySite(options?: DeploymentOptions): Promise<boolean> 
 				spinner.succeed(
 					`Site updated: https://${config.domain}.orbiter.website`,
 				);
-				return true
+			return true;
 		} else {
 			if (shouldStartSpinner)
 				spinner.start(
@@ -862,14 +934,18 @@ export async function deploySite(options?: DeploymentOptions): Promise<boolean> 
 			else
 				spinner.text = `Creating new site: https://${config.domain}.orbiter.website`;
 
-				const createResult = await createSite(config.buildDir, config.domain, true);
+			const createResult = await createSite(
+				config.buildDir,
+				config.domain,
+				true,
+			);
 
-				// Check if creation failed due to site limit (createSite returns undefined on failure)
-				if (!createResult) {
-					// The error message was already shown in createSite, just return
-					spinner.stop()
-					return false;
-				}
+			// Check if creation failed due to site limit (createSite returns undefined on failure)
+			if (!createResult) {
+				// The error message was already shown in createSite, just return
+				spinner.stop();
+				return false;
+			}
 
 			// Update config with new site ID
 			const sites = await listSites(config.domain, false, spinner);
@@ -881,12 +957,12 @@ export async function deploySite(options?: DeploymentOptions): Promise<boolean> 
 				spinner.succeed(
 					`Site deployed: https://${config.domain}.orbiter.website`,
 				);
-			return true
+			return true;
 		}
 	} catch (error) {
 		if (shouldStartSpinner) spinner.fail("Deployment failed");
 		else spinner.text = "Deployment failed";
 		console.error("Error:", error);
-		return false
+		return false;
 	}
 }
