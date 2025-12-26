@@ -1,6 +1,6 @@
 {
 	"name": "orbiter-cli",
-	"version": "0.9.10-beta.1",
+	"version": "0.9.10-beta.3",
 	"author": "Steve Simkins",
 	"license": "MIT",
 	"main": "./dist/index.js",
@@ -9,7 +9,7 @@
 		"orbiter": "./dist/index.js"
 	},
 	"scripts": {
-		"build": "bun build src/index.ts --outdir dist --target node",
+		"build": "bun build src/index.ts --outdir dist --target node --external esbuild",
 		"dev": "bun run build && bun link",
 		"start": "bun ./dist/index.js"
 	},

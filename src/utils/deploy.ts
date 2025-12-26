@@ -8,6 +8,7 @@ import { promisify } from "util";
 import { getValidTokens } from "./auth";
 import { API_URL } from "../config";
 import dotenv from "dotenv";
+import { loadEsbuild } from "./esbuild-loader";
 
 // Detect if running under bun
 function isBunRuntime(): boolean {
@@ -99,59 +100,6 @@ export function createEnvBindings(
 	}));
 }
 
-// // Build server code with bun if available, otherwise use esbuild
-// async function buildWithBun(
-// 	entryPath: string,
-// 	buildDir: string,
-// 	spinner: ora.Ora,
-// ): Promise<void> {
-// 	const outputPath = path.join(buildDir, "index.js");
-
-// 	// Create a temporary build script for bun
-// 	const tempDir = path.join(buildDir, ".temp");
-// 	if (!fs.existsSync(tempDir)) {
-// 		fs.mkdirSync(tempDir, { recursive: true });
-// 	}
-
-// 	const tempEntryPath = path.join(tempDir, "entry.ts");
-
-// 	// Read the original entry file and transform it
-// 	let originalCode = fs.readFileSync(entryPath, "utf8");
-
-// 	// Transform process.env to c.env and remove dotenv imports
-// 	const transformedCode = originalCode
-// 		.replace(/import\s+['"]dotenv\/config['"];?\s*\n?/g, "")
-// 		.replace(/import\s+['"]dotenv['"];?\s*\n?/g, "")
-// 		.replace(/import\s+\*\s+as\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, "")
-// 		.replace(/import\s+\{[^}]*\}\s+from\s+['"]dotenv['"];?\s*\n?/g, "")
-// 		.replace(/import\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, "")
-// 		.replace(/require\s*\(\s*['"]dotenv[^'"]*['"]\s*\);?\s*\n?/g, "")
-// 		.replace(/const\s+\w+\s*=\s*require\s*\(\s*['"]dotenv['"];?\s*\n?/g, "")
-// 		.replace(/process\.env\.([A-Z_][A-Z0-9_]*)/g, "c.env.$1");
-
-// 	// Add Cloudflare Workers compatibility banner
-// 	const finalCode = `// Cloudflare Workers compatibility
-// const process = { env: {} };
-// const global = globalThis;
-
-// ${transformedCode}`;
-
-// 	fs.writeFileSync(tempEntryPath, finalCode);
-
-// 	try {
-// 		// Use bun build command
-// 		const bunBuildCommand = `bun build ${tempEntryPath} --outfile ${outputPath} --target browser --format esm --minify`;
-// 		await execAsync(bunBuildCommand);
-
-// 		// Clean up temp files
-// 		fs.rmSync(tempDir, { recursive: true, force: true });
-// 	} catch (error) {
-// 		// Clean up temp files on error
-// 		fs.rmSync(tempDir, { recursive: true, force: true });
-// 		throw error;
-// 	}
-// }
-
 // Server deployment functions
 export async function buildServerCode(
 	entryPath: string,
@@ -169,8 +117,8 @@ export async function buildServerCode(
 	const outputPath = path.join(buildDir, "index.js");
 
 	try {
-		// Dynamic import to avoid cross version dependency with Bun
-		const esbuild = await import("esbuild");
+		// Load esbuild in an environment-aware way to avoid version conflicts
+		const esbuild = await loadEsbuild();
 		// Build with esbuild for Cloudflare Workers with process.env to c.env transformation
 		const result = await esbuild.build({
 			entryPoints: [entryPath],
