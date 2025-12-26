@@ -1,6 +1,6 @@
 {
 	"name": "orbiter-cli",
-	"version": "0.9.10-beta.3",
+	"version": "0.9.10",
 	"author": "Steve Simkins",
 	"license": "MIT",
 	"main": "./dist/index.js",
