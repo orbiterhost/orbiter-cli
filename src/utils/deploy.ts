@@ -7,7 +7,6 @@ import { listSites, createSite, updateSite } from "./sites";
 import { promisify } from "util";
 import { getValidTokens } from "./auth";
 import { API_URL } from "../config";
-import esbuild from "esbuild";
 import dotenv from "dotenv";
 
 // Detect if running under bun
@@ -173,6 +172,8 @@ export async function buildServerCode(
 		if (useBun) {
 			await buildWithBun(entryPath, buildDir, spinner);
 		} else {
+			// Dynamic import to avoid cross version dependency with Bun
+			const esbuild = await import("esbuild");
 			// Build with esbuild for Cloudflare Workers with process.env to c.env transformation
 			const result = await esbuild.build({
 				entryPoints: [entryPath],
