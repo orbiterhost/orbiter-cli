@@ -43,7 +43,7 @@ jobs:
         run: |
           DOMAIN="gh-wf-bhvr-linux-${{ github.run_id }}"
           echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
-          orbiter new --template bhvr github-workflow-bhvr --domain "${DOMAIN}"
+          orbiter new github-workflow-bhvr --template bhvr --domain "${DOMAIN}"
 
       - name: Test bun run deploy
         run: |
@@ -96,14 +96,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
       - name: Install CLI dependencies
-        run: bun install
+        run: npm install
 
       - name: Build CLI
-        run: bun run build
+        run: npm run build
 
       - name: Link CLI globally
         run: npm link
@@ -113,7 +110,7 @@ jobs:
         run: |
           DOMAIN="gh-wf-react-linux-${{ github.run_id }}"
           echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
-          orbiter new --template react github-workflow-react --domain "${DOMAIN}" --pm bun
+          orbiter new github-workflow-react --template react --domain "${DOMAIN}" --pm npm
 
       - name: Test orbiter deploy
         run: |
@@ -184,7 +181,7 @@ jobs:
         run: |
           DOMAIN="gh-wf-bhvr-win-${{ github.run_id }}"
           echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
-          orbiter new --template bhvr github-workflow-bhvr --domain "${DOMAIN}"
+          orbiter new github-workflow-bhvr --template bhvr --domain "${DOMAIN}"
 
       - name: Test bun run deploy
         shell: bash
@@ -239,14 +236,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
       - name: Install CLI dependencies
-        run: bun install
+        run: npm install
 
       - name: Build CLI
-        run: bun run build
+        run: npm run build
 
       - name: Link CLI globally
         run: npm link
@@ -257,7 +251,7 @@ jobs:
         run: |
           DOMAIN="gh-wf-react-win-${{ github.run_id }}"
           echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
-          orbiter new --template react github-workflow-react --domain "${DOMAIN}" --pm bun
+          orbiter new github-workflow-react --template react --domain "${DOMAIN}" --pm npm
 
       - name: Test orbiter deploy
         shell: bash
