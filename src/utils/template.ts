@@ -24,6 +24,11 @@ interface TemplateOptions {
 	domain?: string;
 }
 
+interface CreateTemplateOptions {
+	domain?: string;
+	packageManager?: string;
+}
+
 interface TemplateMetadata {
 	name: string;
 	displayName: string;
@@ -72,7 +77,7 @@ async function fetchTemplate(
 				// --single-branch: Only clone the main branch
 				// --no-tags: Skip downloading tags
 				await execAsync(
-					`git clone --depth=1 --single-branch --no-tags https://github.com/${TEMPLATES_REPO}.git ${tempDir}`,
+					`git clone --depth=1 --single-branch --no-tags https://github.com/${TEMPLATES_REPO}.git "${tempDir}"`,
 				);
 
 				// Copy only the needed template to the final location
@@ -84,8 +89,8 @@ async function fetchTemplate(
 				);
 				fs.mkdirSync(localTemplatePath, { recursive: true });
 
-				// Copy the specific template to the final destination
-				await execAsync(`cp -r ${templateSourcePath}/* ${localTemplatePath}`);
+				// Copy the specific template to the final destination using cross-platform fs.cpSync
+				fs.cpSync(templateSourcePath, localTemplatePath, { recursive: true });
 
 				// Cleanup temporary directory
 				fs.rmSync(tempDir, { recursive: true, force: true });
@@ -96,8 +101,7 @@ async function fetchTemplate(
 				fs.mkdirSync(localTemplatePath, { recursive: true });
 
 				// Fallback to direct download if git fails
-				const templateUrl = `${TEMPLATES_RAW_URL}/templates/${TEMPLATES_SUBDIRECTORY}/${templateName}`;
-				await downloadTemplateFiles(templateUrl, localTemplatePath);
+				await downloadTemplateFiles(templateName, localTemplatePath);
 			}
 
 			// Create cache metadata
@@ -201,6 +205,7 @@ export async function getTemplateMetadata(
 export async function createTemplateApp(
 	providedName?: string,
 	providedTemplate?: string,
+	options?: CreateTemplateOptions,
 ) {
 	const spinner = ora("Setting Up your app").start();
 	let projectName = providedName as string;
@@ -221,23 +226,32 @@ export async function createTemplateApp(
 			spinner.start("Setting up your app");
 		}
 
-		spinner.stop();
-		const { domain } = await inquirer.prompt([
-			{
-				type: "input",
-				name: "domain",
-				message: "Choose a subdomain for your app (yourname.orbiter.website):",
-				default: projectName.toLowerCase().replace(/\s+/g, "-"),
-				validate: (input) => {
-					if (input.length === 0) return "Subdomain is required";
-					if (input.includes("."))
-						return "Please enter only the subdomain part (without .orbiter.website)";
-					if (!/^[a-z0-9-]+$/.test(input))
-						return "Subdomain can only contain lowercase letters, numbers, and hyphens";
-					return true;
+		// Get domain - use provided option or prompt
+		let domain: string;
+		if (options?.domain) {
+			domain = options.domain;
+			spinner.text = `Using domain: ${domain}`;
+		} else {
+			spinner.stop();
+			const domainAnswer = await inquirer.prompt([
+				{
+					type: "input",
+					name: "domain",
+					message:
+						"Choose a subdomain for your app (yourname.orbiter.website):",
+					default: projectName.toLowerCase().replace(/\s+/g, "-"),
+					validate: (input) => {
+						if (input.length === 0) return "Subdomain is required";
+						if (input.includes("."))
+							return "Please enter only the subdomain part (without .orbiter.website)";
+						if (!/^[a-z0-9-]+$/.test(input))
+							return "Subdomain can only contain lowercase letters, numbers, and hyphens";
+						return true;
+					},
 				},
-			},
-		]);
+			]);
+			domain = domainAnswer.domain;
+		}
 
 		let template: string;
 
@@ -288,12 +302,23 @@ export async function createTemplateApp(
 			template = selectedTemplate;
 		}
 
-		// Rest of the function remains the same
+		// Determine package manager
 		let packageManager: string;
 		let isBhvrTemplate = template === "bhvr";
 
 		if (isBhvrTemplate) {
 			packageManager = "bun";
+		} else if (options?.packageManager) {
+			// Validate the provided package manager
+			const validPackageManagers = ["npm", "yarn", "pnpm", "bun"];
+			if (validPackageManagers.includes(options.packageManager)) {
+				packageManager = options.packageManager;
+			} else {
+				console.warn(
+					`Invalid package manager '${options.packageManager}', defaulting to npm`,
+				);
+				packageManager = "npm";
+			}
 		} else {
 			const { packageManager: choice } = await inquirer.prompt([
 				{
@@ -440,18 +465,27 @@ export async function createTemplateApp(
 							},
 						);
 
-						if (
-							stdout &&
-							stdout.includes("HOUSTON")
-						) {
+						if (stdout && stdout.includes("HOUSTON")) {
 							// The upgrade message was already shown by the CLI, just add additional context
 							spinner.stop();
-						console.log("\n\x1b[31m/////// HOUSTON, WE HAVE A PROBLEM! ///////\x1b[0m");
-							console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
-							console.log("\x1b[31m/// SERVER FUNCTIONS NEED A PAID PLAN /////\x1b[0m");
-							console.log("\x1b[31m/// UPGRADE TO UNLOCK ORBITAL DEPLOYMENT //\x1b[0m");
-							console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
-				console.log("\n\x1b[31m🚀 MISSION CONTROL: https://app.orbiter.host/billing\x1b[0m\n");
+							console.log(
+								"\n\x1b[31m/////// HOUSTON, WE HAVE A PROBLEM! ///////\x1b[0m",
+							);
+							console.log(
+								"\x1b[31m///////////////////////////////////////////\x1b[0m",
+							);
+							console.log(
+								"\x1b[31m/// SERVER FUNCTIONS NEED A PAID PLAN /////\x1b[0m",
+							);
+							console.log(
+								"\x1b[31m/// UPGRADE TO UNLOCK ORBITAL DEPLOYMENT //\x1b[0m",
+							);
+							console.log(
+								"\x1b[31m///////////////////////////////////////////\x1b[0m",
+							);
+							console.log(
+								"\n\x1b[31m🚀 MISSION CONTROL: https://app.orbiter.host/billing\x1b[0m\n",
+							);
 
 							console.log("\nOnce upgraded, deploy the server with:");
 							console.log(`  cd ${projectName}/server`);
@@ -552,9 +586,13 @@ export async function updateCachedTemplates(): Promise<void> {
 	}
 }
 
-async function downloadTemplateFiles(baseUrl: string, targetPath: string) {
-	// First get the directory listing
-	const apiUrl = `https://api.github.com/repos/${TEMPLATES_REPO}/contents/templates/${TEMPLATES_SUBDIRECTORY}/${path.basename(targetPath)}`;
+async function downloadTemplateFiles(
+	templateName: string,
+	targetPath: string,
+	apiPath: string = `templates/${TEMPLATES_SUBDIRECTORY}/${templateName}`,
+) {
+	// Get the directory listing from GitHub API
+	const apiUrl = `https://api.github.com/repos/${TEMPLATES_REPO}/contents/${apiPath}`;
 	const response = await fetch(apiUrl);
 
 	if (!response.ok) {
@@ -567,12 +605,18 @@ async function downloadTemplateFiles(baseUrl: string, targetPath: string) {
 	for (const file of files) {
 		if (file.type === "file") {
 			const fileResponse = await fetch(file.download_url);
+			if (!fileResponse.ok) {
+				throw new Error(
+					`Failed to download file ${file.name}: ${fileResponse.statusText}`,
+				);
+			}
 			const content = await fileResponse.text();
 			fs.writeFileSync(path.join(targetPath, file.name), content);
 		} else if (file.type === "dir") {
 			const dirPath = path.join(targetPath, file.name);
 			fs.mkdirSync(dirPath, { recursive: true });
-			await downloadTemplateFiles(`${baseUrl}/${file.name}`, dirPath);
+			// Recursively download subdirectory using the full API path
+			await downloadTemplateFiles(templateName, dirPath, file.path);
 		}
 	}
 }
