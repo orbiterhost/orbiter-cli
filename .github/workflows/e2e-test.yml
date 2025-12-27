@@ -169,6 +169,9 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Configure git for Windows
+        run: git config --global --unset http.proxy || true
+
       - name: Install CLI dependencies
         run: bun install
 
@@ -241,6 +244,9 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+
+      - name: Configure git for Windows
+        run: git config --global --unset http.proxy || true
 
       - name: Install CLI dependencies
         run: bun install
