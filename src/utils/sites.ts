@@ -69,7 +69,7 @@ export async function createSite(
 				if (spinner) {
 					spinner.stop();
 				}
-				return false
+				return false;
 			}
 		}
 
@@ -92,13 +92,28 @@ export async function createSite(
 			if (spinner) {
 				spinner.stop();
 			}
-			if (result.message && result.message.toLowerCase().includes("site limit")) {
-				console.log("\n\x1b[31m/////// HOUSTON, WE HAVE A PROBLEM! ///////\x1b[0m");
-				console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
-				console.log("\x1b[31m///// YOU'VE HIT YOUR SITE LIMIT! /////////\x1b[0m");
-				console.log("\x1b[31m/// UPGRADE TO UNLOCK MORE SITES //////////\x1b[0m");
-				console.log("\x1b[31m///////////////////////////////////////////\x1b[0m");
-				console.log("\n\x1b[31m🚀 MISSION CONTROL: https://app.orbiter.host/billing\x1b[0m\n");
+			if (
+				result.message &&
+				result.message.toLowerCase().includes("site limit")
+			) {
+				console.log(
+					"\n\x1b[31m/////// HOUSTON, WE HAVE A PROBLEM! ///////\x1b[0m",
+				);
+				console.log(
+					"\x1b[31m///////////////////////////////////////////\x1b[0m",
+				);
+				console.log(
+					"\x1b[31m///// YOU'VE HIT YOUR SITE LIMIT! /////////\x1b[0m",
+				);
+				console.log(
+					"\x1b[31m/// UPGRADE TO UNLOCK MORE SITES //////////\x1b[0m",
+				);
+				console.log(
+					"\x1b[31m///////////////////////////////////////////\x1b[0m",
+				);
+				console.log(
+					"\n\x1b[31m🚀 MISSION CONTROL: https://app.orbiter.host/billing\x1b[0m\n",
+				);
 			} else {
 				console.error("Problem creating site:", result);
 			}
@@ -113,7 +128,7 @@ export async function createSite(
 			spinner.stop();
 		}
 		console.log(error);
-		return false
+		return false;
 	}
 }
 
@@ -169,7 +184,7 @@ export async function listSites(
 			}
 			if (shouldManageSpinner) spinner.stop();
 			if (verbose) {
-				console.log(result);
+				console.log(JSON.stringify(result));
 			}
 			return result;
 		}
@@ -192,7 +207,7 @@ export async function listSites(
 		}
 		if (shouldManageSpinner) spinner.stop();
 		if (verbose) {
-			console.log(result);
+			console.log(JSON.stringify(result));
 		}
 		return result;
 	} catch (error) {
