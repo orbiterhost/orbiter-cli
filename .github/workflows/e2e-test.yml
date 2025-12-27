@@ -1,0 +1,298 @@
+name: E2E CLI Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  ORBITER_API_KEY: ${{ secrets.ORBITER_API_KEY }}
+
+jobs:
+  test-linux-bhvr:
+    name: Linux - BHVR Template
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install CLI dependencies
+        run: bun install
+
+      - name: Build CLI
+        run: bun run build
+
+      - name: Link CLI globally
+        run: npm link
+
+      - name: Create and deploy with BHVR template
+        id: setup
+        run: |
+          DOMAIN="gh-wf-bhvr-linux-${{ github.run_id }}"
+          echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
+          orbiter new --template bhvr github-workflow-bhvr --domain "${DOMAIN}"
+
+      - name: Test bun run deploy
+        run: |
+          cd github-workflow-bhvr
+          bun run deploy
+
+      - name: Get site ID and delete
+        if: always()
+        run: |
+          DOMAIN="${{ steps.setup.outputs.DOMAIN }}"
+
+          # Get the site list filtered by domain
+          SITE_JSON=$(orbiter list -d "${DOMAIN}" 2>/dev/null || echo '{"data":[]}')
+          echo "Site JSON: ${SITE_JSON}"
+
+          # Extract the site ID from the JSON response
+          SITE_ID=$(echo "${SITE_JSON}" | node -e "
+            let data = '';
+            process.stdin.on('data', chunk => data += chunk);
+            process.stdin.on('end', () => {
+              try {
+                const json = JSON.parse(data);
+                if (json.data && json.data[0] && json.data[0].id) {
+                  console.log(json.data[0].id);
+                } else {
+                  process.exit(0);
+                }
+              } catch (e) {
+                process.exit(0);
+              }
+            });
+          ")
+
+          if [ -n "${SITE_ID}" ]; then
+            echo "Site ID: ${SITE_ID}"
+            orbiter delete "${SITE_ID}"
+          else
+            echo "No site found to delete"
+          fi
+
+  test-linux-react:
+    name: Linux - React Template
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install CLI dependencies
+        run: bun install
+
+      - name: Build CLI
+        run: bun run build
+
+      - name: Link CLI globally
+        run: npm link
+
+      - name: Create and deploy with React template
+        id: setup
+        run: |
+          DOMAIN="gh-wf-react-linux-${{ github.run_id }}"
+          echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
+          orbiter new --template react github-workflow-react --domain "${DOMAIN}" --pm bun
+
+      - name: Test orbiter deploy
+        run: |
+          cd github-workflow-react
+          orbiter deploy
+
+      - name: Get site ID and delete
+        if: always()
+        run: |
+          DOMAIN="${{ steps.setup.outputs.DOMAIN }}"
+
+          # Get the site list filtered by domain
+          SITE_JSON=$(orbiter list -d "${DOMAIN}" 2>/dev/null || echo '{"data":[]}')
+          echo "Site JSON: ${SITE_JSON}"
+
+          # Extract the site ID from the JSON response
+          SITE_ID=$(echo "${SITE_JSON}" | node -e "
+            let data = '';
+            process.stdin.on('data', chunk => data += chunk);
+            process.stdin.on('end', () => {
+              try {
+                const json = JSON.parse(data);
+                if (json.data && json.data[0] && json.data[0].id) {
+                  console.log(json.data[0].id);
+                } else {
+                  process.exit(0);
+                }
+              } catch (e) {
+                process.exit(0);
+              }
+            });
+          ")
+
+          if [ -n "${SITE_ID}" ]; then
+            echo "Site ID: ${SITE_ID}"
+            orbiter delete "${SITE_ID}"
+          else
+            echo "No site found to delete"
+          fi
+
+  test-windows-bhvr:
+    name: Windows - BHVR Template
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install CLI dependencies
+        run: bun install
+
+      - name: Build CLI
+        run: bun run build
+
+      - name: Link CLI globally
+        run: npm link
+
+      - name: Create and deploy with BHVR template
+        id: setup
+        shell: bash
+        run: |
+          DOMAIN="gh-wf-bhvr-win-${{ github.run_id }}"
+          echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
+          orbiter new --template bhvr github-workflow-bhvr --domain "${DOMAIN}"
+
+      - name: Test bun run deploy
+        shell: bash
+        run: |
+          cd github-workflow-bhvr
+          bun run deploy
+
+      - name: Get site ID and delete
+        if: always()
+        shell: bash
+        run: |
+          DOMAIN="${{ steps.setup.outputs.DOMAIN }}"
+
+          # Get the site list filtered by domain
+          SITE_JSON=$(orbiter list -d "${DOMAIN}" 2>/dev/null || echo '{"data":[]}')
+          echo "Site JSON: ${SITE_JSON}"
+
+          # Extract the site ID from the JSON response
+          SITE_ID=$(echo "${SITE_JSON}" | node -e "
+            let data = '';
+            process.stdin.on('data', chunk => data += chunk);
+            process.stdin.on('end', () => {
+              try {
+                const json = JSON.parse(data);
+                if (json.data && json.data[0] && json.data[0].id) {
+                  console.log(json.data[0].id);
+                } else {
+                  process.exit(0);
+                }
+              } catch (e) {
+                process.exit(0);
+              }
+            });
+          ")
+
+          if [ -n "${SITE_ID}" ]; then
+            echo "Site ID: ${SITE_ID}"
+            orbiter delete "${SITE_ID}"
+          else
+            echo "No site found to delete"
+          fi
+
+  test-windows-react:
+    name: Windows - React Template
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install CLI dependencies
+        run: bun install
+
+      - name: Build CLI
+        run: bun run build
+
+      - name: Link CLI globally
+        run: npm link
+
+      - name: Create and deploy with React template
+        id: setup
+        shell: bash
+        run: |
+          DOMAIN="gh-wf-react-win-${{ github.run_id }}"
+          echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
+          orbiter new --template react github-workflow-react --domain "${DOMAIN}" --pm bun
+
+      - name: Test orbiter deploy
+        shell: bash
+        run: |
+          cd github-workflow-react
+          orbiter deploy
+
+      - name: Get site ID and delete
+        if: always()
+        shell: bash
+        run: |
+          DOMAIN="${{ steps.setup.outputs.DOMAIN }}"
+
+          # Get the site list filtered by domain
+          SITE_JSON=$(orbiter list -d "${DOMAIN}" 2>/dev/null || echo '{"data":[]}')
+          echo "Site JSON: ${SITE_JSON}"
+
+          # Extract the site ID from the JSON response
+          SITE_ID=$(echo "${SITE_JSON}" | node -e "
+            let data = '';
+            process.stdin.on('data', chunk => data += chunk);
+            process.stdin.on('end', () => {
+              try {
+                const json = JSON.parse(data);
+                if (json.data && json.data[0] && json.data[0].id) {
+                  console.log(json.data[0].id);
+                } else {
+                  process.exit(0);
+                }
+              } catch (e) {
+                process.exit(0);
+              }
+            });
+          ")
+
+          if [ -n "${SITE_ID}" ]; then
+            echo "Site ID: ${SITE_ID}"
+            orbiter delete "${SITE_ID}"
+          else
+            echo "No site found to delete"
+          fi

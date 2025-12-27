@@ -305,9 +305,25 @@ const createTemplateAppCmd = command({
 			description: "Optional template you want to use",
 			defaultValue: undefined,
 		}),
+		domain: option({
+			type: optional(string),
+			long: "domain",
+			short: "d",
+			description: "Domain for the site (enables non-interactive mode)",
+			defaultValue: undefined,
+		}),
+		packageManager: option({
+			type: optional(string),
+			long: "pm",
+			description: "Package manager to use (npm, yarn, pnpm, bun)",
+			defaultValue: undefined,
+		}),
 	},
 	handler: async (args) => {
-		await createTemplateApp(args.projectName, args.template);
+		await createTemplateApp(args.projectName, args.template, {
+			domain: args.domain,
+			packageManager: args.packageManager,
+		});
 	},
 });
 
