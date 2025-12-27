@@ -9,7 +9,7 @@
 		"orbiter": "./dist/index.js"
 	},
 	"scripts": {
-		"build": "bun build src/index.ts --outdir dist --target node --external esbuild",
+		"build": "bun run scripts/build.ts",
 		"dev": "bun run build && bun link",
 		"start": "bun ./dist/index.js"
 	},
@@ -28,13 +28,20 @@
 		"commander": "^13.0.0",
 		"conf": "^13.1.0",
 		"dotenv": "^16.4.7",
-		"esbuild": "^0.25.8",
 		"express": "^4.21.2",
 		"figlet": "^1.8.1",
 		"inquirer": "^12.3.3",
 		"open": "^10.1.0",
 		"ora": "^5.4.1",
 		"pinata-web3": "^0.5.4"
+	},
+	"peerDependencies": {
+		"esbuild": ">=0.25.0"
+	},
+	"peerDependenciesMeta": {
+		"esbuild": {
+			"optional": true
+		}
 	},
 	"engines": {
 		"node": ">=20"
