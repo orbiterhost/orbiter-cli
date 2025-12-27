@@ -36,14 +36,14 @@ jobs:
         run: bun run build
 
       - name: Link CLI globally
-        run: npm link
+        run: bun link
 
       - name: Create and deploy with BHVR template
         id: setup
         run: |
           DOMAIN="gh-wf-bhvr-linux-${{ github.run_id }}"
           echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
-          orbiter new github-workflow-bhvr --template bhvr --domain "${DOMAIN}"
+          orbiter new github-workflow-bhvr --template bhvr --domain "${DOMAIN}" --pm bun
 
       - name: Test bun run deploy
         run: |
@@ -187,7 +187,7 @@ jobs:
         run: |
           DOMAIN="gh-wf-bhvr-win-${{ github.run_id }}"
           echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
-          orbiter new github-workflow-bhvr --template bhvr --domain "${DOMAIN}"
+          orbiter new github-workflow-bhvr --template bhvr --domain "${DOMAIN}" --pm bun
 
       - name: Test bun run deploy
         shell: bash
