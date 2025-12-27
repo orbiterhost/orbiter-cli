@@ -77,7 +77,7 @@ async function fetchTemplate(
 				// --single-branch: Only clone the main branch
 				// --no-tags: Skip downloading tags
 				await execAsync(
-					`git clone --depth=1 --single-branch --no-tags https://github.com/${TEMPLATES_REPO}.git ${tempDir}`,
+					`git clone --depth=1 --single-branch --no-tags https://github.com/${TEMPLATES_REPO}.git "${tempDir}"`,
 				);
 
 				// Copy only the needed template to the final location
@@ -89,8 +89,8 @@ async function fetchTemplate(
 				);
 				fs.mkdirSync(localTemplatePath, { recursive: true });
 
-				// Copy the specific template to the final destination
-				await execAsync(`cp -r ${templateSourcePath}/* ${localTemplatePath}`);
+				// Copy the specific template to the final destination using cross-platform fs.cpSync
+				fs.cpSync(templateSourcePath, localTemplatePath, { recursive: true });
 
 				// Cleanup temporary directory
 				fs.rmSync(tempDir, { recursive: true, force: true });
@@ -101,8 +101,7 @@ async function fetchTemplate(
 				fs.mkdirSync(localTemplatePath, { recursive: true });
 
 				// Fallback to direct download if git fails
-				const templateUrl = `${TEMPLATES_RAW_URL}/templates/${TEMPLATES_SUBDIRECTORY}/${templateName}`;
-				await downloadTemplateFiles(templateUrl, localTemplatePath);
+				await downloadTemplateFiles(templateName, localTemplatePath);
 			}
 
 			// Create cache metadata
@@ -587,9 +586,13 @@ export async function updateCachedTemplates(): Promise<void> {
 	}
 }
 
-async function downloadTemplateFiles(baseUrl: string, targetPath: string) {
-	// First get the directory listing
-	const apiUrl = `https://api.github.com/repos/${TEMPLATES_REPO}/contents/templates/${TEMPLATES_SUBDIRECTORY}/${path.basename(targetPath)}`;
+async function downloadTemplateFiles(
+	templateName: string,
+	targetPath: string,
+	apiPath: string = `templates/${TEMPLATES_SUBDIRECTORY}/${templateName}`,
+) {
+	// Get the directory listing from GitHub API
+	const apiUrl = `https://api.github.com/repos/${TEMPLATES_REPO}/contents/${apiPath}`;
 	const response = await fetch(apiUrl);
 
 	if (!response.ok) {
@@ -602,12 +605,18 @@ async function downloadTemplateFiles(baseUrl: string, targetPath: string) {
 	for (const file of files) {
 		if (file.type === "file") {
 			const fileResponse = await fetch(file.download_url);
+			if (!fileResponse.ok) {
+				throw new Error(
+					`Failed to download file ${file.name}: ${fileResponse.statusText}`,
+				);
+			}
 			const content = await fileResponse.text();
 			fs.writeFileSync(path.join(targetPath, file.name), content);
 		} else if (file.type === "dir") {
 			const dirPath = path.join(targetPath, file.name);
 			fs.mkdirSync(dirPath, { recursive: true });
-			await downloadTemplateFiles(`${baseUrl}/${file.name}`, dirPath);
+			// Recursively download subdirectory using the full API path
+			await downloadTemplateFiles(templateName, dirPath, file.path);
 		}
 	}
 }
