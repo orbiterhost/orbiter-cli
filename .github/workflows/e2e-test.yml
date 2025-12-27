@@ -9,6 +9,9 @@ on:
 
 env:
   ORBITER_API_KEY: ${{ secrets.ORBITER_API_KEY }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+  API_URL: ${{ secrets.API_URL }}
 
 jobs:
   test-linux-bhvr:
