@@ -96,6 +96,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
@@ -113,7 +118,7 @@ jobs:
         run: |
           DOMAIN="gh-wf-react-linux-${{ github.run_id }}"
           echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
-          orbiter new github-workflow-react --template react --domain "${DOMAIN}" --pm npm
+          orbiter new github-workflow-react --template react --domain "${DOMAIN}" --pm pnpm
 
       - name: Test orbiter deploy
         run: |
@@ -242,6 +247,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
@@ -263,7 +273,7 @@ jobs:
         run: |
           DOMAIN="gh-wf-react-win-${{ github.run_id }}"
           echo "DOMAIN=${DOMAIN}" >> $GITHUB_OUTPUT
-          orbiter new github-workflow-react --template react --domain "${DOMAIN}" --pm npm
+          orbiter new github-workflow-react --template react --domain "${DOMAIN}" --pm pnpm
 
       - name: Test orbiter deploy
         shell: bash
