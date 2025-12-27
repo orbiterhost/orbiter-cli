@@ -96,14 +96,17 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install CLI dependencies
-        run: npm install
+        run: bun install
 
       - name: Build CLI
-        run: npm run build
+        run: bun run build
 
       - name: Link CLI globally
-        run: npm link
+        run: bun link
 
       - name: Create and deploy with React template
         id: setup
@@ -173,7 +176,7 @@ jobs:
         run: bun run build
 
       - name: Link CLI globally
-        run: npm link
+        run: bun link
 
       - name: Create and deploy with BHVR template
         id: setup
@@ -236,14 +239,17 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install CLI dependencies
-        run: npm install
+        run: bun install
 
       - name: Build CLI
-        run: npm run build
+        run: bun run build
 
       - name: Link CLI globally
-        run: npm link
+        run: bun link
 
       - name: Create and deploy with React template
         id: setup
