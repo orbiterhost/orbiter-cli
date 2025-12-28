@@ -7,8 +7,8 @@ import { listSites, createSite, updateSite } from "./sites";
 import { promisify } from "util";
 import { getValidTokens } from "./auth";
 import { API_URL } from "../config";
-import esbuild from "esbuild";
 import dotenv from "dotenv";
+import { loadEsbuild } from "./esbuild-loader";
 
 // Detect if running under bun
 function isBunRuntime(): boolean {
@@ -100,59 +100,6 @@ export function createEnvBindings(
 	}));
 }
 
-// Build server code with bun if available, otherwise use esbuild
-async function buildWithBun(
-	entryPath: string,
-	buildDir: string,
-	spinner: ora.Ora,
-): Promise<void> {
-	const outputPath = path.join(buildDir, "index.js");
-
-	// Create a temporary build script for bun
-	const tempDir = path.join(buildDir, ".temp");
-	if (!fs.existsSync(tempDir)) {
-		fs.mkdirSync(tempDir, { recursive: true });
-	}
-
-	const tempEntryPath = path.join(tempDir, "entry.ts");
-
-	// Read the original entry file and transform it
-	let originalCode = fs.readFileSync(entryPath, "utf8");
-
-	// Transform process.env to c.env and remove dotenv imports
-	const transformedCode = originalCode
-		.replace(/import\s+['"]dotenv\/config['"];?\s*\n?/g, "")
-		.replace(/import\s+['"]dotenv['"];?\s*\n?/g, "")
-		.replace(/import\s+\*\s+as\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, "")
-		.replace(/import\s+\{[^}]*\}\s+from\s+['"]dotenv['"];?\s*\n?/g, "")
-		.replace(/import\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, "")
-		.replace(/require\s*\(\s*['"]dotenv[^'"]*['"]\s*\);?\s*\n?/g, "")
-		.replace(/const\s+\w+\s*=\s*require\s*\(\s*['"]dotenv['"];?\s*\n?/g, "")
-		.replace(/process\.env\.([A-Z_][A-Z0-9_]*)/g, "c.env.$1");
-
-	// Add Cloudflare Workers compatibility banner
-	const finalCode = `// Cloudflare Workers compatibility
-const process = { env: {} };
-const global = globalThis;
-
-${transformedCode}`;
-
-	fs.writeFileSync(tempEntryPath, finalCode);
-
-	try {
-		// Use bun build command
-		const bunBuildCommand = `bun build ${tempEntryPath} --outfile ${outputPath} --target browser --format esm --minify`;
-		await execAsync(bunBuildCommand);
-
-		// Clean up temp files
-		fs.rmSync(tempDir, { recursive: true, force: true });
-	} catch (error) {
-		// Clean up temp files on error
-		fs.rmSync(tempDir, { recursive: true, force: true });
-		throw error;
-	}
-}
-
 // Server deployment functions
 export async function buildServerCode(
 	entryPath: string,
@@ -170,90 +117,87 @@ export async function buildServerCode(
 	const outputPath = path.join(buildDir, "index.js");
 
 	try {
-		if (useBun) {
-			await buildWithBun(entryPath, buildDir, spinner);
-		} else {
-			// Build with esbuild for Cloudflare Workers with process.env to c.env transformation
-			const result = await esbuild.build({
-				entryPoints: [entryPath],
-				bundle: true,
-				outfile: outputPath,
-				platform: "browser", // Cloudflare Workers use browser-like environment
-				target: ["es2020"], // Cloudflare Workers support ES2020
-				format: "esm", // ES modules format for Workers
-				minify: true,
-				sourcemap: false,
-				// Handle Node.js polyfills for Cloudflare Workers
-				define: {
-					"process.env.NODE_ENV": '"production"',
-				},
-				// External modules that Cloudflare Workers provide
-				external: ["dotenv"],
-				// Conditions for resolving imports
-				conditions: ["worker", "browser"],
-				// Main fields to check when resolving packages
-				mainFields: ["browser", "module", "main"],
-				// Ensure all dependencies are bundled
-				packages: "bundle",
-				// Handle potential Node.js specific imports
-				banner: {
-					js: `
+		// Load esbuild in an environment-aware way to avoid version conflicts
+		const esbuild = await loadEsbuild();
+		// Build with esbuild for Cloudflare Workers with process.env to c.env transformation
+		const result = await esbuild.build({
+			entryPoints: [entryPath],
+			bundle: true,
+			outfile: outputPath,
+			platform: "browser", // Cloudflare Workers use browser-like environment
+			target: ["es2020"], // Cloudflare Workers support ES2020
+			format: "esm", // ES modules format for Workers
+			minify: true,
+			sourcemap: false,
+			// Handle Node.js polyfills for Cloudflare Workers
+			define: {
+				"process.env.NODE_ENV": '"production"',
+			},
+			// External modules that Cloudflare Workers provide
+			external: ["dotenv"],
+			// Conditions for resolving imports
+			conditions: ["worker", "browser"],
+			// Main fields to check when resolving packages
+			mainFields: ["browser", "module", "main"],
+			// Ensure all dependencies are bundled
+			packages: "bundle",
+			// Handle potential Node.js specific imports
+			banner: {
+				js: `
 // Cloudflare Workers compatibility
 const process = { env: {} };
 const global = globalThis;
-					`.trim(),
-				},
-				// Plugins for handling specific scenarios
-				plugins: [
-					{
-						name: "cloudflare-transform",
-						setup(build) {
-							build.onLoad({ filter: /\.(ts|js)$/ }, async (args) => {
-								const fs = await import("fs/promises");
+				`.trim(),
+			},
+			// Plugins for handling specific scenarios
+			plugins: [
+				{
+					name: "cloudflare-transform",
+					setup(build) {
+						build.onLoad({ filter: /\.(ts|js)$/ }, async (args) => {
+							const fs = await import("fs/promises");
 
-								try {
-									let contents = await fs.readFile(args.path, "utf8");
-									const originalContents = contents;
+							try {
+								let contents = await fs.readFile(args.path, "utf8");
 
-									// 1. Remove dotenv imports (comprehensive patterns)
-									const dotenvPatterns = [
-										/import\s+['"]dotenv\/config['"];?\s*\n?/g, // import 'dotenv/config'
-										/import\s+['"]dotenv['"];?\s*\n?/g, // import 'dotenv'
-										/import\s+\*\s+as\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import * as dotenv from 'dotenv'
-										/import\s+\{[^}]*\}\s+from\s+['"]dotenv['"];?\s*\n?/g, // import { config } from 'dotenv'
-										/import\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import dotenv from 'dotenv'
-										/require\s*\(\s*['"]dotenv[^'"]*['"]\s*\);?\s*\n?/g, // require('dotenv/config')
-										/const\s+\w+\s*=\s*require\s*\(\s*['"]dotenv['"];?\s*\n?/g, // const dotenv = require('dotenv')
-									];
+								// 1. Remove dotenv imports (comprehensive patterns)
+								const dotenvPatterns = [
+									/import\s+['"]dotenv\/config['"];?\s*\n?/g, // import 'dotenv/config'
+									/import\s+['"]dotenv['"];?\s*\n?/g, // import 'dotenv'
+									/import\s+\*\s+as\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import * as dotenv from 'dotenv'
+									/import\s+\{[^}]*\}\s+from\s+['"]dotenv['"];?\s*\n?/g, // import { config } from 'dotenv'
+									/import\s+\w+\s+from\s+['"]dotenv['"];?\s*\n?/g, // import dotenv from 'dotenv'
+									/require\s*\(\s*['"]dotenv[^'"]*['"]\s*\);?\s*\n?/g, // require('dotenv/config')
+									/const\s+\w+\s*=\s*require\s*\(\s*['"]dotenv['"];?\s*\n?/g, // const dotenv = require('dotenv')
+								];
 
-									dotenvPatterns.forEach((pattern) => {
-										contents = contents.replace(pattern, "");
-									});
+								dotenvPatterns.forEach((pattern) => {
+									contents = contents.replace(pattern, "");
+								});
 
-									// 2. Transform process.env to c.env
-									contents = contents.replace(
-										/process\.env\.([A-Z_][A-Z0-9_]*)/g,
-										"c.env.$1",
-									);
+								// 2. Transform process.env to c.env
+								contents = contents.replace(
+									/process\.env\.([A-Z_][A-Z0-9_]*)/g,
+									"c.env.$1",
+								);
 
-									return {
-										contents,
-										loader: args.path.endsWith(".ts") ? "ts" : "js",
-									};
-								} catch (error) {
-									return null; // Let esbuild handle it normally
-								}
-							});
-						},
+								return {
+									contents,
+									loader: args.path.endsWith(".ts") ? "ts" : "js",
+								};
+							} catch (error) {
+								return null; // Let esbuild handle it normally
+							}
+						});
 					},
-				],
-			});
+				},
+			],
+		});
 
-			if (result.errors.length > 0) {
-				throw new Error(
-					`Build errors: ${result.errors.map((e) => e.text).join(", ")}`,
-				);
-			}
+		if (result.errors.length > 0) {
+			throw new Error(
+				`Build errors: ${result.errors.map((e) => e.text).join(", ")}`,
+			);
 		}
 
 		// Write metadata about the build
