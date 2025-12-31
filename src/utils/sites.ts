@@ -421,7 +421,7 @@ export async function listVersions(domain: string) {
 			return;
 		}
 		spinner.stop();
-		console.log(result);
+		console.log(JSON.stringify(result));
 		return result;
 	} catch (error) {
 		spinner.stop();
