@@ -386,7 +386,7 @@ const deployServerCmd = command({
 const cli = subcommands({
 	name: "orbiter",
 	description: `\n ${text} \n Create and manage static sites with Orbiter. Get started by running orbiter auth`,
-	version: "0.9.10",
+	version: "0.9.11",
 	cmds: {
 		login: loginCmd,
 		auth: authCmd,
